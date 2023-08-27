@@ -1,0 +1,13 @@
+app:
+  name: 'dynamic-user-segmentation-service'
+  version: '1.0.0'
+
+http:
+  port: '8080'
+
+logger:
+  log_level: 'debug'
+  rollbar_env: 'dynamic-user-segmentation-service'
+
+postgres:
+  pool_max: 20
