@@ -23,14 +23,14 @@ func (val *Validator) Validate(i interface{}) error {
 	if err == nil {
 		return nil
 	}
-	str := err.Error()
-	// ind := strings.Index(str, ":Field")
-	// _ = ind
-	indx := strings.Index(str, "Field validation")
-	if indx > 0 {
-		str = str[indx:]
+	var (
+		str string
+	)
+	if ok := err.(validator.ValidationErrors); ok != nil {
+		for _, v := range ok {
+			str = str + v.Field() + " "
+		}
 	}
-
-	err = errors.New(strings.Replace(strings.ToLower(str), "\n", ", ", -1))
+	err = errors.New("err: " + strings.ToLower(str) + ": fields required (with: '_')")
 	return err
 }

@@ -5,19 +5,13 @@ import (
 	"os"
 
 	"github.com/adsrkey/dynamic-user-segmentation-service/config"
-	"github.com/adsrkey/dynamic-user-segmentation-service/internal/delivery/http"
-	v1 "github.com/adsrkey/dynamic-user-segmentation-service/internal/delivery/http/v1/routes"
-	"github.com/adsrkey/dynamic-user-segmentation-service/internal/es/broker"
-	kafkaConsumer "github.com/adsrkey/dynamic-user-segmentation-service/internal/es/consumer"
-	kafkaProducer "github.com/adsrkey/dynamic-user-segmentation-service/internal/es/producer"
 	repository "github.com/adsrkey/dynamic-user-segmentation-service/internal/repository/postgres"
-	"github.com/adsrkey/dynamic-user-segmentation-service/internal/usecase"
-	"github.com/adsrkey/dynamic-user-segmentation-service/internal/usecase/segment"
-	"github.com/adsrkey/dynamic-user-segmentation-service/internal/usecase/user"
+	segmentUseCase "github.com/adsrkey/dynamic-user-segmentation-service/internal/segment/usecase"
+	"github.com/adsrkey/dynamic-user-segmentation-service/internal/server"
+	usecase "github.com/adsrkey/dynamic-user-segmentation-service/internal/usecases"
+	userUseCase "github.com/adsrkey/dynamic-user-segmentation-service/internal/user/usecase"
 	"github.com/adsrkey/dynamic-user-segmentation-service/pkg/postgres"
 	"github.com/adsrkey/dynamic-user-segmentation-service/pkg/validator"
-	"github.com/confluentinc/confluent-kafka-go/kafka"
-	kafka_go "github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/gommon/log"
 )
@@ -48,54 +42,21 @@ func Run(cfg *config.Config) {
 	log.Info("Initializing repositories...")
 	repo := repository.New(pg)
 
-	// kafka
-	topic := "dynamic_service"
-
-	p, err := kafka_go.NewProducer(&kafka_go.ConfigMap{
-		// TODO:
-		"bootstrap.servers": "localhost:9092",
-		"client.id":         "dynamic_seg_srv",
-		"acks":              "all",
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	kafkaProducer := kafkaProducer.New(p, kafkaProducer.Config{
-		// TODO:
-		Address: "localhost:9092",
-		Topic:   topic,
-	})
-
-	c, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": "localhost:9092",
-		"group.id":          "dynamic_seg_srv",
-		"auto.offset.reset": "smallest",
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	kafkaConsumer := kafkaConsumer.New(c, kafkaConsumer.Config{
-		Address: "localhost:9092",
-		Topic:   topic,
-	})
-
-	messageBroker := broker.NewKafkaMessageBroker(kafkaProducer, kafkaConsumer)
-
 	// Services dependencies
 	log.Info("Initializing usecases...")
-	segmentUC := segment.New(log, repo.Segment, messageBroker)
-	userUC := user.New(log, repo.User, messageBroker)
 
-	usecases := usecase.New().SetSegment(segmentUC).SetUser(userUC).Build()
+	segmentUseCase := segmentUseCase.New(log, repo.Segment)
+	userUseCase := userUseCase.New(log, repo.User)
 
-	v1.New(e, usecases)
+	usecases := usecase.New().SetSegment(segmentUseCase).SetUser(userUseCase).Build()
 
 	// HTTP server
 	log.Info("Starting http server...")
 	log.Debugf("Server port: %s", cfg.HTTP.Port)
-	server := http.New(cfg.HTTP, e)
+
+	server := server.New(cfg.HTTP, e)
+
+	server.MapRoutes(usecases)
 	server.Start()
 
 	// Waiting signal
