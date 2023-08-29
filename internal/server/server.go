@@ -9,7 +9,7 @@ import (
 
 func (de *Delivery) Start() {
 	go func() {
-		err := de.echo.Start(":" + de.cfg.Port)
+		err := de.echo.Start(de.cfg.Host + ":" + de.cfg.Port)
 		if err != nil {
 			de.log.Error(err)
 		}

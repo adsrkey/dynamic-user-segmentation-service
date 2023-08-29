@@ -21,3 +21,10 @@ func BindGetActiveSegmentsInput(c echo.Context, input *dto.GetActiveSegments) er
 	}
 	return nil
 }
+
+func BindReportInput(c echo.Context, input *dto.ReportInput) error {
+	if err := c.Bind(input); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, errors.Wrap(err, "could not decode user data"))
+	}
+	return nil
+}

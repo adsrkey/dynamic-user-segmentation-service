@@ -14,6 +14,8 @@ type User interface {
 	AddToSegments(ctx context.Context, input dto.AddToSegmentInput, process *dto.Process) (slugs []string, err error)
 	DeleteFromSegments(ctx context.Context, input dto.AddToSegmentInput, process *dto.Process) (err error)
 	SelectSegmentID(ctx context.Context, slug string) (uuid.UUID, error)
+	AddToOperationsOutbox(ctx context.Context, operation dto.Operation) (err error)
+	SelectReport(ctx context.Context, input dto.ReportInput) (reports []dto.Report, err error)
 }
 
 type Segment interface {

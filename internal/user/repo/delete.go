@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/Masterminds/squirrel"
 	dto "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler/user"
@@ -27,8 +28,17 @@ func (r *Repo) DeleteFromSegments(ctx context.Context, input dto.AddToSegmentInp
 		return repoerrs.ErrDB
 	}
 
-	for _, v := range input.SlugsDel {
-		err := r.deleteFromSegmentTx(ctx, tx, v, input.UserID)
+	outboxTx, err := r.Pool.BeginTx(ctx, pgx.TxOptions{
+		IsoLevel:   pgx.RepeatableRead,
+		AccessMode: pgx.ReadWrite,
+	})
+	if err != nil {
+		r.Log.Error(err)
+		return repoerrs.ErrDB
+	}
+
+	for _, slug := range input.SlugsDel {
+		err := r.deleteFromSegmentTx(ctx, tx, slug, input.UserID)
 		if err != nil {
 			process.ErrDelCh <- struct{}{}
 			if errors.Is(err, repoerrs.ErrDB) {
@@ -37,6 +47,38 @@ func (r *Repo) DeleteFromSegments(ctx context.Context, input dto.AddToSegmentInp
 			}
 			return err
 		}
+
+		go func(slug *string) {
+			// add successful transaction to operation outbox
+			op := dto.Operation{
+				UserID: input.UserID,
+				// because slug == segment name
+				Segment:     *slug,
+				Operation:   "delete",
+				OperationAt: time.Now(),
+			}
+			_, err = r.addToOperationsOutboxTx(context.Background(), outboxTx, op)
+			if err != nil {
+				return
+			}
+			select {
+			case _, ok := <-process.ErrAddCh:
+				if ok {
+					return
+				} else {
+					r.Log.Debug("OK! Commit! delete outbox")
+
+					err = outboxTx.Commit(ctx)
+					if err != nil {
+						errRollback := outboxTx.Rollback(ctx)
+						if errRollback != nil {
+							return
+						}
+						return
+					}
+				}
+			}
+		}(&slug)
 	}
 
 	close(process.ErrDelCh)

@@ -60,3 +60,21 @@ func (uc *UseCase) GetActiveSegments(ctx context.Context, userID uuid.UUID) (slu
 
 	return slugs, nil
 }
+
+// TODO:
+func (uc *UseCase) Reports(ctx context.Context, input dto.ReportInput) (reports []dto.Report, err error) {
+	reports, err = uc.repo.SelectReport(ctx, input)
+	if err != nil {
+		if errors.Is(err, repoerrs.ErrDB) {
+			return nil, usecase_errors.ErrDB
+		}
+		return nil, err
+	}
+	// TODO: запустить ftp или как там сервер файлов
+	// TODO: создать csv файл и кинуть ссылку!
+
+	// address := c.Echo().Server.Addr
+	// link, err := linkgenerator.GenerateReportsLink(input)
+
+	return reports, nil
+}

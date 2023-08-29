@@ -2,7 +2,9 @@ package user
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -13,6 +15,7 @@ import (
 	usecase_errors "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/usecase/errors"
 	"github.com/adsrkey/dynamic-user-segmentation-service/internal/usecases"
 	"github.com/adsrkey/dynamic-user-segmentation-service/pkg/logger"
+	linkgenerator "github.com/adsrkey/dynamic-user-segmentation-service/pkg/utils/link_generator"
 	"github.com/labstack/echo/v4"
 	"github.com/pkg/errors"
 )
@@ -38,6 +41,12 @@ func New(
 	return h
 }
 
+func Success(c echo.Context) error {
+	return c.JSON(http.StatusCreated, response.Response{
+		Message: "success",
+	})
+}
+
 func contains(elems []string, v string) bool {
 	for _, s := range elems {
 		if v == s {
@@ -49,8 +58,7 @@ func contains(elems []string, v string) bool {
 
 // ВОПРОС: Если добавляются и удаляются те же самые слаги, то что делать, удалять сразу у пользователя?
 // получается мы добавляем 3 слага и удаляем потом опять же их
-func (r *handler) addToSegment(c echo.Context) (err error) {
-	time.Sleep(10 * time.Second)
+func (h *handler) addToSegment(c echo.Context) (err error) {
 	var (
 		// context
 		timeout     = 5 * time.Minute
@@ -130,7 +138,7 @@ func (r *handler) addToSegment(c echo.Context) (err error) {
 
 		go func(p *dto.Process) {
 			defer wg.Done()
-			p.ErrAdd = r.uc.AddToSegment(ctx, input, p)
+			p.ErrAdd = h.uc.AddToSegment(ctx, input, p)
 		}(process)
 
 	} else {
@@ -143,7 +151,7 @@ func (r *handler) addToSegment(c echo.Context) (err error) {
 
 		go func(p *dto.Process) {
 			defer wg.Done()
-			p.ErrDel = r.uc.DeleteFromSegment(ctx, input, p)
+			p.ErrDel = h.uc.DeleteFromSegment(ctx, input, p)
 		}(process)
 
 	} else {
@@ -195,14 +203,7 @@ func (r *handler) addToSegment(c echo.Context) (err error) {
 	return
 }
 
-func Success(c echo.Context) error {
-	return c.JSON(http.StatusCreated, response.Response{
-		Message: "success",
-	})
-}
-
-func (r *handler) getActiveSegments(c echo.Context) (err error) {
-	time.Sleep(5 * time.Second)
+func (h *handler) getActiveSegments(c echo.Context) (err error) {
 	var (
 		// context
 		timeout     = 5 * time.Minute
@@ -231,7 +232,7 @@ func (r *handler) getActiveSegments(c echo.Context) (err error) {
 		slugs []string
 	)
 
-	slugs, err = r.uc.GetActiveSegments(ctx, input.UserID)
+	slugs, err = h.uc.GetActiveSegments(ctx, input.UserID)
 	if err != nil {
 		return err
 	}
@@ -240,4 +241,76 @@ func (r *handler) getActiveSegments(c echo.Context) (err error) {
 		UserID: input.UserID,
 		Slugs:  slugs,
 	})
+}
+
+// TODO:
+func (h *handler) reports(c echo.Context) (err error) {
+	var (
+		// context
+		timeout     = 5 * time.Minute
+		ctx, cancel = context.WithTimeout(c.Request().Context(), timeout)
+
+		input dto.ReportInput
+	)
+
+	defer cancel()
+
+	// Bind
+	err = BindReportInput(c, &input)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, response.ErrResponse{
+			Message: routeerrs.ErrNotDecodeJSONData.Error(),
+		})
+	}
+
+	// Validate
+	err = ValidateReportInput(c, &input)
+	if err != nil {
+		return err
+	}
+
+	// TODO:
+
+	reports, err := h.uc.Reports(ctx, input)
+	if err != nil {
+		// TODO:
+		return err
+	}
+
+	link, err := linkgenerator.GenerateReportsLink(reports, "http://"+c.Echo().Server.Addr)
+	if err != nil {
+		// TODO:
+		return err
+	}
+
+	return c.JSON(http.StatusCreated, response.ReportResponse{
+		Link: link,
+	})
+}
+
+func (h *handler) file(c echo.Context) (err error) {
+	var (
+		fileId string
+	)
+
+	// TODO:
+
+	fileId = c.QueryParam("file_id")
+	if fileId == "" {
+		return fmt.Errorf("file_id is empty")
+	}
+
+	file, err := os.Open("./files/" + fileId + ".csv")
+	defer file.Close()
+
+	if err != nil {
+		c.JSON(http.StatusNotFound, map[string]string{
+			"message": "file not found",
+		})
+		return err
+	}
+
+	c.Response().Status = http.StatusOK
+	http.ServeFile(c.Response().Writer, c.Request(), file.Name())
+	return
 }

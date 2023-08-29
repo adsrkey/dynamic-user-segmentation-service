@@ -28,3 +28,19 @@ func ValidateGetActiveSegmentsInput(c echo.Context, input *dto.GetActiveSegments
 	}
 	return nil
 }
+
+func ValidateReportInput(c echo.Context, input *dto.ReportInput) error {
+	if err := c.Validate(input); err != nil {
+		return echo.NewHTTPError(http.StatusUnprocessableEntity, err)
+	}
+	if input.UserID == uuid.Nil {
+		return echo.NewHTTPError(http.StatusUnprocessableEntity, fmt.Errorf("fields dont be empty"))
+	}
+	if input.Year == 0 {
+		return echo.NewHTTPError(http.StatusUnprocessableEntity, fmt.Errorf("field 'year' dont be empty"))
+	}
+	if input.Month == 0 {
+		return echo.NewHTTPError(http.StatusUnprocessableEntity, fmt.Errorf("field 'month' dont be empty"))
+	}
+	return nil
+}

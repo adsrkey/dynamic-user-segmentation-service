@@ -12,6 +12,8 @@ type User interface {
 	AddToSegment(ctx context.Context, input dto.AddToSegmentInput, process *dto.Process) (err error)
 	DeleteFromSegment(ctx context.Context, input dto.AddToSegmentInput, process *dto.Process) (err error)
 	GetActiveSegments(ctx context.Context, userID uuid.UUID) (slugs []string, err error)
+
+	Reports(ctx context.Context, input dto.ReportInput) (report []dto.Report, err error)
 }
 
 type Segment interface {

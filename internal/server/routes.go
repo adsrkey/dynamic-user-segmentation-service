@@ -49,7 +49,7 @@ func (de *Delivery) MapRoutes(usecases usecases.UseCases) {
 
 	v1 := de.echo.Group("/api/v1")
 	{
-		v1.Use(ValidContentType)
+		// v1.Use(ValidContentType)
 		segmentGroup := v1.Group("/segment")
 		{
 			segmentHandler.New(segmentGroup, usecases.Segment(), de.echo.Logger)

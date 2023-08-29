@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/Masterminds/squirrel"
+	dto "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler/user"
 	repoerrs "github.com/adsrkey/dynamic-user-segmentation-service/internal/repository/postgres/errors"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -130,6 +132,33 @@ func (r *Repo) SelectActiveUserSegments(ctx context.Context, userID uuid.UUID) (
 	return slugs, err
 }
 
+func (r *Repo) SelectReport(ctx context.Context, input dto.ReportInput) (reports []dto.Report, err error) {
+	tx, err := r.Pool.BeginTx(ctx, pgx.TxOptions{
+		IsoLevel:   pgx.ReadCommitted,
+		AccessMode: pgx.ReadOnly,
+	})
+	if err != nil {
+		r.Log.Error(err)
+		return nil, repoerrs.ErrDB
+	}
+
+	reports, err = r.selectReportTx(ctx, tx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		errRollback := tx.Rollback(ctx)
+		if errRollback != nil {
+			return nil, errRollback
+		}
+		return nil, err
+	}
+
+	return reports, nil
+}
+
 func (r *Repo) selectSegmentTx(ctx context.Context, tx pgx.Tx, slug string) (uuid.UUID, error) {
 	sql, args, err := r.Builder.Select("id").
 		From("segments").
@@ -145,13 +174,6 @@ func (r *Repo) selectSegmentTx(ctx context.Context, tx pgx.Tx, slug string) (uui
 	if err != nil {
 		r.Log.Debugf("err: %v", err)
 
-		var pgErr *pgconn.PgError
-		if ok := errors.As(err, &pgErr); ok {
-			if pgErr.Code == "23505" {
-				return uuid.UUID{}, repoerrs.ErrAlreadyExists
-			}
-		}
-
 		if ok := errors.Is(err, pgx.ErrNoRows); ok {
 			r.Log.Debugf(pgx.ErrNoRows.Error())
 			return uuid.UUID{}, fmt.Errorf("segment with slug: %s %s", slug, repoerrs.ErrNotFound)
@@ -161,4 +183,43 @@ func (r *Repo) selectSegmentTx(ctx context.Context, tx pgx.Tx, slug string) (uui
 	}
 
 	return selectedSegmentID, nil
+}
+
+func (r *Repo) selectReportTx(ctx context.Context, tx pgx.Tx, input dto.ReportInput) (reports []dto.Report, err error) {
+
+	operationAt := time.Date(input.Year, input.Month, 1, 0, 0, 0, 0, time.UTC)
+
+	sql, args, err := r.Builder.Select("id", "user_id", "segment", "operation", "operation_at").
+		From("operations_outbox").
+		Where(squirrel.Eq{"user_id": input.UserID}, " AND operation_at > ", operationAt).
+		ToSql()
+
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := tx.Query(ctx, sql, args...)
+	if err != nil {
+		r.Log.Debugf("err: %v", err)
+
+		if ok := errors.Is(err, pgx.ErrNoRows); ok {
+			r.Log.Debugf(pgx.ErrNoRows.Error())
+			return nil, fmt.Errorf("report with user_id: %s %s", input.UserID, repoerrs.ErrNotFound)
+		}
+
+		return nil, repoerrs.ErrDB
+	}
+
+	reports = make([]dto.Report, 0, 1)
+
+	for rows.Next() {
+		var report dto.Report
+		if err := rows.Scan(&report.ID, &report.UserID, &report.Segment,
+			&report.Operation, &report.OperationAt); err != nil {
+			return nil, err
+		}
+		reports = append(reports, report)
+	}
+
+	return reports, nil
 }
