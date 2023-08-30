@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/adsrkey/dynamic-user-segmentation-service/config"
 	repository "github.com/adsrkey/dynamic-user-segmentation-service/internal/repository/postgres"
@@ -55,8 +56,19 @@ func Run(cfg *config.Config) {
 	usecases := usecase.New().SetSegment(segmentUseCase).SetUser(userUseCase).Build()
 
 	worker := ttl_worker.New(repo.User)
+
+	TTLWorkerTimeout := 10 * time.Second
+
 	go func() {
-		worker.DeleteUserFromSegment(ctx)
+		for {
+			<-time.After(TTLWorkerTimeout)
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			worker.DeleteUserFromSegment(ctx)
+		}
 	}()
 
 	// HTTP server

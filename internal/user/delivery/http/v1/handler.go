@@ -55,8 +55,6 @@ func contains(elems []string, v string) bool {
 	return false
 }
 
-// ВОПРОС: Если добавляются и удаляются те же самые слаги, то что делать, удалять сразу у пользователя?
-// получается мы добавляем 3 слага и удаляем потом опять же их
 func (h *handler) addToSegment(c echo.Context) (err error) {
 	var (
 		now = time.Now()
@@ -84,7 +82,24 @@ func (h *handler) addToSegment(c echo.Context) (err error) {
 	}
 	input.OperationAt = now
 
-	// input.OperationAt = c.Request().
+	if input.Ttl != "" {
+		//ttl - seconds
+
+		// ttl like "2006-01-02T15:04:05Z07:00"
+		ttl, err := time.Parse(time.RFC3339, input.Ttl)
+		if err != nil {
+			return c.JSON(http.StatusConflict, response.ErrResponse{
+				Message: "err with parse ttl: " + input.Ttl,
+			})
+		}
+
+		if ttl.Second() > now.Second() {
+			return c.JSON(http.StatusConflict, response.ErrResponse{
+				Message: "ttl will be greater than now date: " + input.Ttl,
+			})
+		}
+		input.TTL = ttl
+	}
 
 	var (
 		isSlugsAddEmpty = len(input.SlugsAdd) == 0
@@ -102,6 +117,10 @@ func (h *handler) addToSegment(c echo.Context) (err error) {
 				dup = append(dup, v)
 			}
 		}
+		// ttl лишний
+	} else if !isSlugsAddEmpty && isSlugsDelEmpty {
+		// TTL to worker
+		// h.uc.TTLWorker()
 	}
 
 	if !isDupEmpty {
@@ -127,9 +146,7 @@ func (h *handler) addToSegment(c echo.Context) (err error) {
 		return
 	}
 
-	time.Sleep(1 * time.Minute)
-
-	c.JSON(http.StatusInternalServerError, response.Response{
+	c.JSON(http.StatusOK, response.Response{
 		Message: "success",
 	})
 	return

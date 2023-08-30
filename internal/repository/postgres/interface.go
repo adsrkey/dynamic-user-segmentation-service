@@ -22,7 +22,10 @@ type User interface {
 
 	GetPool() postgres.PgxPool
 
+	DeleteSegmentTTL(ctx context.Context, tx pgx.Tx, data dto.TTLTx) (err error)
+
 	AddToOutbox
+	TTL
 }
 
 type Segment interface {
@@ -33,4 +36,8 @@ type Segment interface {
 
 type AddToOutbox interface {
 	AddToOperationsOutboxTx(ctx context.Context, tx pgx.Tx, operation dto.SegmentTx) (operationID uuid.UUID, err error)
+}
+
+type TTL interface {
+	SelectSegmentTTL(ctx context.Context, tx pgx.Tx, data dto.TTLTx) (results []dto.TTLTxR, err error)
 }

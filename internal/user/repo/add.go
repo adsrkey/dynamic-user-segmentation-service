@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
+	"time"
 
 	"github.com/Masterminds/squirrel"
 	dto "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler/user"
@@ -13,12 +15,40 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+func (r *Repo) ttlTx(ctx context.Context, tx pgx.Tx, input dto.SegmentTx) (err error) {
+	sql, args, err := r.Builder.
+		Insert("ttl_segments").
+		Columns("user_id", "segment_id", "ttl").
+		Values(input.UserID, input.SegmentID, input.TTL).
+		Suffix("RETURNING id").
+		ToSql()
+
+	// TODO: хм, может на хранимки переписать
+	if err != nil {
+		return err
+	}
+	var id uuid.UUID
+	err = tx.QueryRow(ctx, sql, args...).Scan(&id)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (r *Repo) SegmentTx(ctx context.Context, tx pgx.Tx, input dto.SegmentTx) (operation dto.Operation, err error) {
 	// Select segment_id
-	selectedSegmentID, err := r.selectSegmentTx(ctx, tx, input.Slug)
-	// rollback inside selectSegmentTx if err
-	if err != nil {
-		return dto.Operation{}, err
+	var (
+		selectedSegmentID uuid.UUID
+	)
+
+	if input.SegmentID != uuid.Nil {
+		selectedSegmentID = input.SegmentID
+	} else {
+		selectedSegmentID, err = r.selectSegmentTx(ctx, tx, input.Slug)
+		// rollback inside selectSegmentTx if err
+		if err != nil {
+			return dto.Operation{}, err
+		}
 	}
 
 	// TODO: select user_id if exists // create user
@@ -30,6 +60,15 @@ func (r *Repo) SegmentTx(ctx context.Context, tx pgx.Tx, input dto.SegmentTx) (o
 	)
 
 	if input.Operation == AddProcess {
+		// add ttl
+		if !reflect.DeepEqual(input.TTL, time.Time{}) {
+			input.SegmentID = selectedSegmentID
+			err = r.ttlTx(ctx, tx, input)
+			if err != nil {
+				return dto.Operation{}, err
+			}
+		}
+
 		sql, args, err = r.Builder.
 			Insert("segments_users").
 			Columns("segment_id", "user_id").

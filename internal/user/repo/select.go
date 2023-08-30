@@ -209,12 +209,38 @@ func (r *Repo) SelectReport(ctx context.Context, input dto.ReportInput) (reports
 	return reports, nil
 }
 
+func (r *Repo) SelectSegment(ctx context.Context, tx pgx.Tx, data dto.TTLTx) (results []dto.TTLTxR, err error) {
+	sql, args, err := r.Builder.Select("user_id", "segment_id").
+		From("ttl_segments").
+		Where(squirrel.LtOrEq{"ttl": data.TTL}).
+		ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := tx.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	results = make([]dto.TTLTxR, 0)
+
+	for rows.Next() {
+		var result dto.TTLTxR
+		if err := rows.Scan(&result.UserID, &result.SegmentID); err != nil {
+			return nil, err
+		}
+		results = append(results, result)
+	}
+
+	return results, nil
+}
+
 func (r *Repo) selectSegmentTx(ctx context.Context, tx pgx.Tx, slug string) (uuid.UUID, error) {
 	sql, args, err := r.Builder.Select("id").
 		From("segments").
 		Where(squirrel.Eq{"slug": slug}).
 		ToSql()
-
 	if err != nil {
 		return uuid.UUID{}, err
 	}
@@ -272,4 +298,57 @@ func (r *Repo) selectReportTx(ctx context.Context, tx pgx.Tx, input dto.ReportIn
 	}
 
 	return reports, nil
+}
+
+func (r *Repo) SelectSegmentTTL(ctx context.Context, tx pgx.Tx, data dto.TTLTx) (results []dto.TTLTxR, err error) {
+	ttl, err := time.Parse(time.RFC3339, data.TTL)
+	if err != nil {
+		return nil, err
+	}
+	sql, args, err := r.Builder.Select("user_id", "segment_id").
+		From("ttl_segments").
+		Where(squirrel.LtOrEq{"ttl": ttl}).
+		ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := tx.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	results = make([]dto.TTLTxR, 0, 1)
+
+	for rows.Next() {
+		var result dto.TTLTxR
+		if err := rows.Scan(&result.UserID, &result.SegmentID); err != nil {
+			return nil, err
+		}
+		results = append(results, result)
+	}
+
+	return results, nil
+}
+
+func (r *Repo) DeleteSegmentTTL(ctx context.Context, tx pgx.Tx, data dto.TTLTx) (err error) {
+	ttl, err := time.Parse(time.RFC3339, data.TTL)
+	if err != nil {
+		return err
+	}
+
+	sql, args, err := r.Builder.
+		Delete("ttl_segments").
+		Where(squirrel.Eq{"ttl": ttl}).
+		ToSql()
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(ctx, sql, args...)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

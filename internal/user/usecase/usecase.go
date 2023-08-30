@@ -187,23 +187,32 @@ func (uc *UseCase) processToSegments(ctx context.Context, tx pgx.Tx, input dto.A
 			UserID:    input.UserID,
 			CreatedAt: input.OperationAt,
 			Operation: process,
+			TTL:       input.TTL,
 		}
 	)
 
 	if process == AddProcess {
 		operations = make([]dto.Operation, 0, len(input.SlugsAdd))
+		for _, slug := range input.SlugsAdd {
+			segmentTxDTO.Slug = slug
+
+			operation, err := uc.repo.SegmentTx(ctx, tx, segmentTxDTO)
+			if err != nil {
+				return nil, err
+			}
+			operations = append(operations, operation)
+		}
 	} else if process == DeleteProcess {
 		operations = make([]dto.Operation, 0, len(input.SlugsDel))
-	}
+		for _, slug := range input.SlugsDel {
+			segmentTxDTO.Slug = slug
 
-	for _, slug := range input.SlugsAdd {
-		segmentTxDTO.Slug = slug
-
-		operation, err := uc.repo.SegmentTx(ctx, tx, segmentTxDTO)
-		if err != nil {
-			return nil, err
+			operation, err := uc.repo.SegmentTx(ctx, tx, segmentTxDTO)
+			if err != nil {
+				return nil, err
+			}
+			operations = append(operations, operation)
 		}
-		operations = append(operations, operation)
 	}
 
 	return operations, nil
