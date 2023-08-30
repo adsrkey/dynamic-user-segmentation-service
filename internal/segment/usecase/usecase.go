@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	dto "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler/user"
 	usecase_errors "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/usecase/errors"
 	repo "github.com/adsrkey/dynamic-user-segmentation-service/internal/repository/postgres"
 	repoerrs "github.com/adsrkey/dynamic-user-segmentation-service/internal/repository/postgres/errors"
@@ -23,8 +24,8 @@ func New(log logger.Logger, repo repo.Segment) *UseCase {
 	}
 }
 
-func (uc *UseCase) Create(ctx context.Context, slug string) (segmentID uuid.UUID, err error) {
-	segmentID, err = uc.repo.Create(ctx, slug)
+func (uc *UseCase) Create(ctx context.Context, operation dto.Operation) (segmentID uuid.UUID, err error) {
+	segmentID, err = uc.repo.Create(ctx, operation)
 	if err != nil {
 		// TODO:
 		if errors.Is(err, repoerrs.ErrDB) {
@@ -36,8 +37,8 @@ func (uc *UseCase) Create(ctx context.Context, slug string) (segmentID uuid.UUID
 	return segmentID, nil
 }
 
-func (uc *UseCase) Delete(ctx context.Context, slug string) (err error) {
-	_, err = uc.repo.Delete(ctx, slug)
+func (uc *UseCase) Delete(ctx context.Context, operation dto.Operation) (err error) {
+	err = uc.repo.Delete(ctx, operation)
 	if err != nil {
 		// TODO:
 		if errors.Is(err, repoerrs.ErrDB) {
@@ -45,6 +46,7 @@ func (uc *UseCase) Delete(ctx context.Context, slug string) (err error) {
 		}
 		return err
 	}
+	// TODO: outbox
 
 	return nil
 }

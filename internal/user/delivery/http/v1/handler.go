@@ -6,13 +6,12 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	response "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler"
 	routeerrs "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler/errors"
 	dto "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler/user"
-	usecase_errors "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/usecase/errors"
+	repoerrs "github.com/adsrkey/dynamic-user-segmentation-service/internal/repository/postgres/errors"
 	"github.com/adsrkey/dynamic-user-segmentation-service/internal/usecases"
 	"github.com/adsrkey/dynamic-user-segmentation-service/pkg/logger"
 	linkgenerator "github.com/adsrkey/dynamic-user-segmentation-service/pkg/utils/link_generator"
@@ -60,6 +59,7 @@ func contains(elems []string, v string) bool {
 // получается мы добавляем 3 слага и удаляем потом опять же их
 func (h *handler) addToSegment(c echo.Context) (err error) {
 	var (
+		now = time.Now()
 		// context
 		timeout     = 5 * time.Minute
 		ctx, cancel = context.WithTimeout(c.Request().Context(), timeout)
@@ -67,7 +67,6 @@ func (h *handler) addToSegment(c echo.Context) (err error) {
 		// request body dto
 		input dto.AddToSegmentInput
 	)
-
 	defer cancel()
 
 	// Bind
@@ -83,13 +82,17 @@ func (h *handler) addToSegment(c echo.Context) (err error) {
 	if err != nil {
 		return err
 	}
+	input.OperationAt = now
+
+	// input.OperationAt = c.Request().
 
 	var (
 		isSlugsAddEmpty = len(input.SlugsAdd) == 0
 		isSlugsDelEmpty = len(input.SlugsDel) == 0
 
 		// slice of duplicates
-		dup = make([]string, 0, 1)
+		dup        = make([]string, 0, 1)
+		isDupEmpty = len(dup) == 0
 	)
 
 	// Duplicate. Checking if there are duplicates
@@ -101,112 +104,41 @@ func (h *handler) addToSegment(c echo.Context) (err error) {
 		}
 	}
 
-	var (
-		isDupEmpty = len(dup) == 0
-	)
-
 	if !isDupEmpty {
 		return c.JSON(http.StatusConflict, response.ErrResponse{
 			Message: "contains duplicates data in arrays with duplicate slugs: " + strings.Join(dup[:], ","),
 		})
 	}
 
-	var (
-		// just bool variable to check is ErrDB error
-		isErrDB bool
-
-		// strings to collect and give it to response
-		msgDel string
-		msgAdd string
-
-		errDelCh chan struct{}
-		errAddCh chan struct{}
-	)
-
-	errDelCh = make(chan struct{}, 1)
-	errAddCh = make(chan struct{}, 1)
-
-	process := &dto.Process{
-		ErrDelCh: errDelCh,
-		ErrAddCh: errAddCh,
-	}
-
-	wg := &sync.WaitGroup{}
-
-	if !isSlugsAddEmpty {
-		wg.Add(1)
-
-		go func(p *dto.Process) {
-			defer wg.Done()
-			p.ErrAdd = h.uc.AddToSegment(ctx, input, p)
-		}(process)
-
-	} else {
-		close(process.ErrAddCh)
-	}
-
-	// TODO: отменить добавление, если удалить не получилось!!!
-	if !isSlugsDelEmpty {
-		wg.Add(1)
-
-		go func(p *dto.Process) {
-			defer wg.Done()
-			p.ErrDel = h.uc.DeleteFromSegment(ctx, input, p)
-		}(process)
-
-	} else {
-		close(process.ErrDelCh)
-	}
-
-	wg.Wait()
-
-	if process.ErrDel != nil {
-		if errors.Is(process.ErrDel, usecase_errors.ErrDB) {
-			isErrDB = true
-		} else {
-			msgDel = process.ErrDel.Error()
-		}
-	}
-
-	if process.ErrAdd != nil {
-		if errors.Is(process.ErrAdd, usecase_errors.ErrDB) {
-			isErrDB = true
-		} else {
-			msgAdd = process.ErrAdd.Error()
-		}
-	}
-
-	if process.ErrDel == nil && process.ErrAdd == nil {
-		Success(c)
-		return
-	}
-
-	if isErrDB {
-		c.JSON(http.StatusInternalServerError, response.ErrResponse{
-			Message: "InternalServerError",
+	// select and insert if not exists
+	err = h.uc.CreateUser(ctx, input.UserID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, response.ErrResponse{
+			Message: err.Error(),
 		})
 		return
 	}
 
-	response := response.ErrResponse{}
-
-	if msgAdd != "" {
-		response.Message = "add: " + msgAdd
+	err = h.uc.AddOrDeleteUserSegment(ctx, input)
+	if err != nil {
+		c.JSON(http.StatusConflict, response.ErrResponse{
+			Message: err.Error(),
+		})
+		return
 	}
 
-	if msgDel != "" {
-		response.Message = response.Message + "; " + "delete: " + msgDel
-	}
+	time.Sleep(1 * time.Minute)
 
-	c.JSON(http.StatusNotFound, response)
-
+	c.JSON(http.StatusInternalServerError, response.Response{
+		Message: "success",
+	})
 	return
 }
 
 func (h *handler) getActiveSegments(c echo.Context) (err error) {
 	var (
 		// context
-		timeout     = 5 * time.Minute
+		timeout     = 1 * time.Second
 		ctx, cancel = context.WithTimeout(c.Request().Context(), timeout)
 
 		input dto.GetActiveSegments
@@ -234,10 +166,22 @@ func (h *handler) getActiveSegments(c echo.Context) (err error) {
 
 	slugs, err = h.uc.GetActiveSegments(ctx, input.UserID)
 	if err != nil {
-		return err
+		if errors.Is(err, repoerrs.ErrDB) {
+			return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+				Message: "InternalServerError",
+			})
+		}
 	}
 
-	return c.JSON(http.StatusNotFound, dto.GetActiveSegmentsResponse{
+	if len(slugs) == 0 {
+		return c.JSON(http.StatusNotFound, dto.ErrorResponse{
+			Message: "no active segments",
+		})
+	}
+
+	time.Sleep(1 * time.Minute)
+
+	return c.JSON(http.StatusOK, dto.GetActiveSegmentsResponse{
 		UserID: input.UserID,
 		Slugs:  slugs,
 	})
@@ -247,7 +191,7 @@ func (h *handler) getActiveSegments(c echo.Context) (err error) {
 func (h *handler) reports(c echo.Context) (err error) {
 	var (
 		// context
-		timeout     = 5 * time.Minute
+		timeout     = 1 * time.Minute
 		ctx, cancel = context.WithTimeout(c.Request().Context(), timeout)
 
 		input dto.ReportInput

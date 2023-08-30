@@ -13,47 +13,49 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-type Worker struct {
-	Pool  postgres.PgxPool
-	Log   logger.Logger
-	cache *Cache
+type OperationWorker struct {
+	Pool postgres.PgxPool
+	Log  logger.Logger
+
+	cache *OperationCache
 }
 
-type Cache struct {
+type OperationCache struct {
 	mu         *sync.RWMutex
 	operations []dto.Operation
 }
 
-func New(pool postgres.PgxPool, log logger.Logger) *Worker {
-	return &Worker{
+func New(pool postgres.PgxPool, log logger.Logger) *OperationWorker {
+	ow := &OperationWorker{
 		Pool: pool,
 		Log:  log,
-		cache: &Cache{
+		cache: &OperationCache{
 			operations: make([]dto.Operation, 0),
 			mu:         &sync.RWMutex{},
 		},
 	}
+	return ow
 }
 
-func (cache *Cache) Add(operations []dto.Operation) {
+func (cache *OperationCache) Add(operations []dto.Operation) {
 	cache.mu.Lock()
 	cache.operations = append(cache.operations, operations...)
 	cache.mu.Unlock()
 }
 
-func (cache *Cache) DeleteFrom(indx int) {
+func (cache *OperationCache) DeleteFrom(indx int) {
 	if indx != 0 && indx > 0 {
 		cache.operations = cache.operations[indx:]
 	}
 }
 
-func (cache *Cache) Clean() {
+func (cache *OperationCache) Clean() {
 	cache.mu.Lock()
 	cache.operations = make([]dto.Operation, 0)
 	cache.mu.Unlock()
 }
 
-func (w *Worker) PingProcess(ctx context.Context) error {
+func (w *OperationWorker) PingProcess(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -69,14 +71,14 @@ func (w *Worker) PingProcess(ctx context.Context) error {
 	}
 }
 
-func (w *Worker) ProcessFromCache(ctx context.Context) {
+func (w *OperationWorker) ProcessFromCache(ctx context.Context) {
 	w.PingProcess(ctx)
 
 }
 
 type addToOperationsOutboxTx func(ctx context.Context, tx pgx.Tx, operation dto.Operation) (operationID uuid.UUID, err error)
 
-func (w *Worker) OperationProcess(
+func (w *OperationWorker) OperationProcess(
 	ctx context.Context,
 	slugs []string,
 	operation string,
@@ -88,6 +90,8 @@ func (w *Worker) OperationProcess(
 	// как вариант - передать как ивент в кафку и воркером оттуда брать, но пока так, через горутину:
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	w.Log.Debug("worker #1")
 
 	operations := make([]dto.Operation, 0, len(slugs))
 	for _, slug := range slugs {
@@ -103,6 +107,8 @@ func (w *Worker) OperationProcess(
 		operations = append(operations, op)
 	}
 
+	w.Log.Debug("worker #2")
+
 	outboxTx, err := w.Pool.BeginTx(ctx, pgx.TxOptions{
 		IsoLevel:   pgx.RepeatableRead,
 		AccessMode: pgx.ReadWrite,
@@ -112,6 +118,8 @@ func (w *Worker) OperationProcess(
 		w.cache.Add(operations)
 		return err
 	}
+
+	w.Log.Debug("worker #3")
 
 	for i := 0; i < len(operations); i++ {
 		_, err = operationsOutboxTxFunc(ctx, outboxTx, operations[i])

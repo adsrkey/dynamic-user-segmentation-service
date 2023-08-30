@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/adsrkey/dynamic-user-segmentation-service/internal/server"
 	usecase "github.com/adsrkey/dynamic-user-segmentation-service/internal/usecases"
 	userUseCase "github.com/adsrkey/dynamic-user-segmentation-service/internal/user/usecase"
+	ttl_worker "github.com/adsrkey/dynamic-user-segmentation-service/internal/user/worker/ttl"
 	"github.com/adsrkey/dynamic-user-segmentation-service/pkg/postgres"
 	"github.com/adsrkey/dynamic-user-segmentation-service/pkg/validator"
 	"github.com/labstack/echo/v4"
@@ -17,6 +19,8 @@ import (
 )
 
 func Run(cfg *config.Config) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	// echo - http framework
 	e := echo.New()
 
@@ -49,6 +53,11 @@ func Run(cfg *config.Config) {
 	userUseCase := userUseCase.New(log, repo.User)
 
 	usecases := usecase.New().SetSegment(segmentUseCase).SetUser(userUseCase).Build()
+
+	worker := ttl_worker.New(repo.User)
+	go func() {
+		worker.DeleteUserFromSegment(ctx)
+	}()
 
 	// HTTP server
 	log.Info("Starting http server...")

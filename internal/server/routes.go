@@ -50,11 +50,11 @@ func (de *Delivery) MapRoutes(usecases usecases.UseCases) {
 	v1 := de.echo.Group("/api/v1")
 	{
 		// v1.Use(ValidContentType)
-		segmentGroup := v1.Group("/segment")
+		segmentGroup := v1.Group("/segments")
 		{
 			segmentHandler.New(segmentGroup, usecases.Segment(), de.echo.Logger)
 		}
-		userGroup := v1.Group("/user")
+		userGroup := v1.Group("/users")
 		{
 			userHandler.New(userGroup, usecases.User(), de.echo.Logger)
 		}

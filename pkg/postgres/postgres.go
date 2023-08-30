@@ -40,7 +40,8 @@ type Postgres struct {
 
 	Log     logger.Logger
 	Builder squirrel.StatementBuilderType
-	Pool    PgxPool
+
+	Pool PgxPool
 }
 
 func New(cfg config.PG, log logger.Logger) (*Postgres, error) {

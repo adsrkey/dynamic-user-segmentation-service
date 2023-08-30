@@ -8,7 +8,8 @@ import (
 
 	response "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler"
 	handler_errors "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler/errors"
-	dto "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler/segment"
+	segmentDTO "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler/segment"
+	userDTO "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler/user"
 	usecase_errors "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/usecase/errors"
 	"github.com/adsrkey/dynamic-user-segmentation-service/internal/usecases"
 	"github.com/adsrkey/dynamic-user-segmentation-service/pkg/logger"
@@ -39,12 +40,13 @@ func New(
 // create. -
 func (r *handler) create(c echo.Context) (err error) {
 	var (
+		now = time.Now()
 		// context
 		timeout     = 1 * time.Second
 		ctx, cancel = context.WithTimeout(c.Request().Context(), timeout)
 
 		// request body dto
-		input dto.SlugInput
+		input segmentDTO.SlugInput
 	)
 
 	defer cancel()
@@ -60,7 +62,13 @@ func (r *handler) create(c echo.Context) (err error) {
 		return err
 	}
 
-	_, err = r.uc.Create(ctx, input.Slug)
+	operation := userDTO.Operation{
+		Segment:     input.Slug,
+		OperationAt: now,
+		Operation:   segmentDTO.DeleteProcess,
+	}
+
+	_, err = r.uc.Create(ctx, operation)
 	if err != nil {
 		if errors.Is(err, usecase_errors.ErrDB) {
 			return c.JSON(http.StatusInternalServerError, response.ErrResponse{
@@ -77,12 +85,13 @@ func (r *handler) create(c echo.Context) (err error) {
 
 func (r *handler) delete(c echo.Context) (err error) {
 	var (
+		now = time.Now()
 		// context
-		timeout     = 1 * time.Second
+		timeout     = 5 * time.Minute
 		ctx, cancel = context.WithTimeout(c.Request().Context(), timeout)
 
 		// request body dto
-		input dto.SlugInput
+		input segmentDTO.SlugInput
 	)
 
 	defer cancel()
@@ -98,7 +107,13 @@ func (r *handler) delete(c echo.Context) (err error) {
 		return err
 	}
 
-	err = r.uc.Delete(ctx, input.Slug)
+	operation := userDTO.Operation{
+		Segment:     input.Slug,
+		OperationAt: now,
+		Operation:   segmentDTO.DeleteProcess,
+	}
+
+	err = r.uc.Delete(ctx, operation)
 	if err != nil {
 		if errors.Is(err, usecase_errors.ErrDB) {
 			return c.JSON(http.StatusInternalServerError, response.ErrResponse{

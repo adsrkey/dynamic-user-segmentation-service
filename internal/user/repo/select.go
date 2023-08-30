@@ -12,12 +12,29 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func (r *Repo) SelectUser(ctx context.Context, userID uuid.UUID) error {
-	tx, err := r.Pool.BeginTx(ctx, pgx.TxOptions{
+func (r *Repo) SelectUser(ctx context.Context, userID uuid.UUID) (err error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var (
+		conn *pgxpool.Conn
+		tx   pgx.Tx
+	)
+
+	conn, err = r.Pool.Acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		conn.Release()
+	}()
+
+	tx, err = conn.BeginTx(ctx, pgx.TxOptions{
 		IsoLevel:   pgx.ReadCommitted,
-		AccessMode: pgx.ReadWrite,
+		AccessMode: pgx.ReadOnly,
 	})
 	if err != nil {
 		r.Log.Error(err)
@@ -66,17 +83,31 @@ func (r *Repo) selectUserTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID) er
 	return nil
 }
 
-func (r *Repo) SelectSegmentID(ctx context.Context, slug string) (uuid.UUID, error) {
-	tx, err := r.Pool.BeginTx(ctx, pgx.TxOptions{
+func (r *Repo) SelectSegmentID(ctx context.Context, slug string) (id uuid.UUID, err error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var (
+		conn *pgxpool.Conn
+		tx   pgx.Tx
+	)
+
+	conn, err = r.Pool.Acquire(ctx)
+	if err != nil {
+		return uuid.UUID{}, err
+	}
+	defer conn.Release()
+
+	tx, err = r.Pool.BeginTx(ctx, pgx.TxOptions{
 		IsoLevel:   pgx.RepeatableRead,
-		AccessMode: pgx.ReadWrite,
+		AccessMode: pgx.ReadOnly,
 	})
 	if err != nil {
 		r.Log.Error(err)
-		return uuid.UUID{}, repoerrs.ErrDB
+		return id, repoerrs.ErrDB
 	}
 
-	id, err := r.selectSegmentTx(ctx, tx, slug)
+	id, err = r.selectSegmentTx(ctx, tx, slug)
 	if err != nil {
 		return uuid.UUID{}, err
 	}
@@ -94,6 +125,14 @@ func (r *Repo) SelectSegmentID(ctx context.Context, slug string) (uuid.UUID, err
 }
 
 func (r *Repo) SelectActiveUserSegments(ctx context.Context, userID uuid.UUID) (slugs []string, err error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	conn, err := r.Pool.Acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	sql, args, err := r.Builder.Select("slug").
 		From("segments_users as su").
 		Join("public.segments s ON s.id = su.segment_id").
@@ -102,12 +141,14 @@ func (r *Repo) SelectActiveUserSegments(ctx context.Context, userID uuid.UUID) (
 
 	slugs = make([]string, 0, 0)
 
-	rows, err := r.Pool.Query(ctx, sql, args...)
-
+	rows, err := conn.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
+
 	// TODO:
+	conn.Release()
+
 	for rows.Next() {
 		var n string
 		err = rows.Scan(&n)
@@ -133,7 +174,16 @@ func (r *Repo) SelectActiveUserSegments(ctx context.Context, userID uuid.UUID) (
 }
 
 func (r *Repo) SelectReport(ctx context.Context, input dto.ReportInput) (reports []dto.Report, err error) {
-	tx, err := r.Pool.BeginTx(ctx, pgx.TxOptions{
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	conn, err := r.Pool.Acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Release()
+
+	tx, err := conn.BeginTx(ctx, pgx.TxOptions{
 		IsoLevel:   pgx.ReadCommitted,
 		AccessMode: pgx.ReadOnly,
 	})
