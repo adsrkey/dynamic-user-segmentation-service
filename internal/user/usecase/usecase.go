@@ -33,12 +33,10 @@ func New(log logger.Logger, repo repo.User) *UseCase {
 }
 
 func (uc *UseCase) CreateUser(ctx context.Context, userID uuid.UUID) (err error) {
-	// select
 	err = uc.repo.SelectUser(ctx, userID)
 	if err != nil {
 		if errors.Is(err, repoerrs.ErrNotFound) {
 
-			// insert
 			errCreate := uc.repo.CreateUser(ctx, userID)
 			if errCreate != nil {
 
@@ -51,7 +49,6 @@ func (uc *UseCase) CreateUser(ctx context.Context, userID uuid.UUID) (err error)
 
 				return errCreate
 			} else {
-				// user created
 				return nil
 			}
 
@@ -64,7 +61,6 @@ func (uc *UseCase) CreateUser(ctx context.Context, userID uuid.UUID) (err error)
 		return err
 	}
 
-	// user exist in db
 	return nil
 }
 
@@ -93,16 +89,12 @@ func (uc *UseCase) AddOrDeleteUserSegment(ctx context.Context, input dto.AddToSe
 	}()
 
 	tx, err = conn.BeginTx(ctx, pgx.TxOptions{
-		IsoLevel:   pgx.ReadUncommitted, // ? так быстрее, время важно, можно потом откатить при 2PC или SAGA
+		IsoLevel:   pgx.ReadUncommitted,
 		AccessMode: pgx.ReadWrite,
 	})
 	if err != nil {
 		return repoerrs.ErrDB
 	}
-	// realease conn or close tx.Conn().Close(ctx)
-	defer func() {
-		tx.Conn().Close(ctx)
-	}()
 
 	if isSlugsAddLenGreter {
 		operations = make([]dto.Operation, 0, len(input.SlugsAdd))
@@ -158,7 +150,6 @@ func (uc *UseCase) GetActiveSegments(ctx context.Context, userID uuid.UUID) (slu
 	return slugs, nil
 }
 
-// TODO:
 func (uc *UseCase) Reports(ctx context.Context, input dto.ReportInput) (reports []dto.Report, err error) {
 	reports, err = uc.repo.SelectReport(ctx, input)
 	if err != nil {
@@ -168,11 +159,6 @@ func (uc *UseCase) Reports(ctx context.Context, input dto.ReportInput) (reports 
 
 		return nil, err
 	}
-	// TODO: запустить ftp или как там сервер файлов
-	// TODO: создать csv файл и кинуть ссылку!
-
-	// address := c.Echo().Server.Addr
-	// link, err := linkgenerator.GenerateReportsLink(input)
 
 	return reports, nil
 }

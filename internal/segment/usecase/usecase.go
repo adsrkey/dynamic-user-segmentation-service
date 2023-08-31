@@ -45,6 +45,8 @@ func (uc *UseCase) Create(ctx context.Context, operation segmentDTO.Operation) (
 		AccessMode: pgx.ReadWrite,
 	})
 	if err != nil {
+		uc.log.Debug("segmentUseCase.Create conn.BeginTx()", err)
+
 		return uuid.UUID{}, repoerrs.ErrDB
 	}
 
@@ -107,10 +109,14 @@ func (uc *UseCase) Create(ctx context.Context, operation segmentDTO.Operation) (
 
 	err = tx.Commit(ctx)
 	if err != nil {
+		uc.log.Debug("segmentUseCase.Create tx.Commit()", err)
+
 		errRollback := tx.Rollback(ctx)
 		if errRollback != nil {
+			uc.log.Debug("segmentUseCase.Create tx.Rollback()", errRollback)
 			return uuid.UUID{}, errRollback
 		}
+
 		return uuid.UUID{}, err
 	}
 
@@ -118,6 +124,10 @@ func (uc *UseCase) Create(ctx context.Context, operation segmentDTO.Operation) (
 		IsoLevel:   pgx.ReadCommitted,
 		AccessMode: pgx.ReadWrite,
 	})
+	if err != nil {
+		uc.log.Debug("segmentUseCase.Create conn.BeginTx()", err)
+		return uuid.UUID{}, err
+	}
 
 	if len(segmentTxs) > 0 {
 		for _, input := range segmentTxs {
@@ -128,8 +138,12 @@ func (uc *UseCase) Create(ctx context.Context, operation segmentDTO.Operation) (
 		}
 		err = outboxTx.Commit(ctx)
 		if err != nil {
+			uc.log.Debug("segmentUseCase.Create outboxTx.Commit()", err)
+
 			errRollback := tx.Rollback(ctx)
 			if errRollback != nil {
+				uc.log.Debug("segmentUseCase.Create tx.Rollback()", err)
+
 				return uuid.UUID{}, errRollback
 			}
 			return uuid.UUID{}, err

@@ -22,13 +22,16 @@ func (r *Repo) ttlTx(ctx context.Context, tx pgx.Tx, input userDTO.SegmentTx) (e
 		Values(input.UserID, input.SegmentID, input.TTL).
 		Suffix("RETURNING id").
 		ToSql()
-
 	if err != nil {
+		r.Log.Debug("Repo.ttlTx, r.Builder.Insert()", err)
 		return err
 	}
+
 	var id uuid.UUID
+
 	err = tx.QueryRow(ctx, sql, args...).Scan(&id)
 	if err != nil {
+		r.Log.Debug("Repo.ttlTx, tx.QueryRow()", err)
 		return err
 	}
 	return nil
@@ -72,6 +75,7 @@ func (r *Repo) SegmentTx(ctx context.Context, tx pgx.Tx, input userDTO.SegmentTx
 			ToSql()
 
 		if err != nil {
+			r.Log.Debug("Repo.SegmentTx, add_process, r.Builder.Insert()", err)
 			return userDTO.Operation{}, err
 		}
 
@@ -84,6 +88,7 @@ func (r *Repo) SegmentTx(ctx context.Context, tx pgx.Tx, input userDTO.SegmentTx
 			ToSql()
 
 		if err != nil {
+			r.Log.Debug("Repo.SegmentTx, delete_process, r.Builder.Insert()", err)
 			return userDTO.Operation{}, err
 		}
 
@@ -92,9 +97,11 @@ func (r *Repo) SegmentTx(ctx context.Context, tx pgx.Tx, input userDTO.SegmentTx
 
 	err = tx.QueryRow(ctx, sql, args...).Scan(&segmentID)
 	if err != nil {
+		r.Log.Debug("Repo.SegmentTx,  tx.QueryRow()", err)
 
 		errRollback := tx.Rollback(ctx)
 		if errRollback != nil {
+			r.Log.Debug("Repo.SegmentTx, tx.Rollback()", err)
 			return userDTO.Operation{}, errRollback
 		}
 
@@ -144,12 +151,14 @@ func (r *Repo) AddUserSegmentToOperationsOutboxTx(ctx context.Context, tx pgx.Tx
 		Suffix("RETURNING id").
 		ToSql()
 	if err != nil {
+		r.Log.Debug("Repo.AddUserSegmentToOperationsOutboxTx, r.Builder.Insert()", err)
 		return uuid.UUID{}, err
 	}
 
 	// Insert
 	err = tx.QueryRow(ctx, sql, args...).Scan(&operationID)
 	if err != nil {
+		r.Log.Debug("Repo.AddUserSegmentToOperationsOutboxTx, tx.QueryRow()", err)
 		var errMsg string
 
 		var pgErr *pgconn.PgError

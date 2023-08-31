@@ -2,7 +2,6 @@ package server
 
 import (
 	"log"
-	"net/http"
 	"os"
 
 	segmentHandler "github.com/adsrkey/dynamic-user-segmentation-service/internal/segment/delivery/http/v1"
@@ -11,45 +10,11 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func ValidContentType(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		contentType := c.Request().Header.Get(echo.HeaderContentType)
-		if contentType != echo.MIMEApplicationJSON {
-
-			type errResponse struct {
-				Message string `json:"message"`
-			}
-
-			if contentType == "" {
-				msg := "missing Header: Content-Type"
-				c.JSON(http.StatusBadRequest, errResponse{
-					Message: msg,
-				})
-				return nil
-			}
-
-			msg := "invalid mime type: " + contentType
-
-			c.JSON(http.StatusBadRequest, errResponse{
-				Message: msg,
-			})
-			return nil
-		}
-
-		if err := next(c); err != nil {
-			c.Error(err)
-		}
-		return nil
-	}
-}
-
 func (de *Delivery) MapRoutes(usecases usecases.UseCases) {
-	// TODO: Add Middleware
 	de.echo.GET("/health", func(c echo.Context) error { return c.NoContent(200) })
 
 	v1 := de.echo.Group("/api/v1")
 	{
-		// v1.Use(ValidContentType)
 		segmentGroup := v1.Group("/segments")
 		{
 			segmentHandler.New(segmentGroup, usecases.Segment(), de.echo.Logger)

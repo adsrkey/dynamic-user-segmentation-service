@@ -1,13 +1,20 @@
 package user
 
+import "github.com/adsrkey/dynamic-user-segmentation-service/pkg/middleware"
+
 func (h *handler) MapUserRoutes() {
-	segments := h.group.Group("/segments")
+	validJson := h.group.Group("/segments")
+	validJson.Use(middleware.ValidContentType)
 
-	segments.POST("", h.addToSegment)
+	validJson.POST("", h.addToSegment)
 	// h.group.GET("/:user_id/segments", h.getActiveSegments)
-	segments.GET("", h.getActiveSegments)
-	segments.POST("/reports", h.reports)
-	segments.GET("/files", h.file)
 
-	h.group = segments
+	validJson.GET("", h.getActiveSegments)
+	validJson.POST("/reports", h.reports)
+
+	group := validJson.Group("/files")
+
+	group.GET("", h.file)
+
+	h.group = group
 }

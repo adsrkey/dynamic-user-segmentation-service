@@ -25,7 +25,7 @@ type handler struct {
 func New(
 	group *echo.Group,
 	uc usecases.Segment,
-	log logger.Logger) *handler { // TODO: to interface
+	log logger.Logger) *handler {
 
 	h := &handler{
 		uc:    uc,

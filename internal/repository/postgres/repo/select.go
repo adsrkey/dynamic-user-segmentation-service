@@ -26,6 +26,7 @@ func (r *Repo) SelectUser(ctx context.Context, userID uuid.UUID) (err error) {
 
 	conn, err = r.Pool.Acquire(ctx)
 	if err != nil {
+		r.Log.Debug("Repo.SelectUser, r.Pool.Acquire()", err)
 		return err
 	}
 	defer func() {
@@ -37,21 +38,27 @@ func (r *Repo) SelectUser(ctx context.Context, userID uuid.UUID) (err error) {
 		AccessMode: pgx.ReadOnly,
 	})
 	if err != nil {
-		r.Log.Error(err)
+		r.Log.Debug("Repo.SelectUser, conn.BeginTx()", err)
 		return repoerrs.ErrDB
 	}
 
 	err = r.selectUserTx(ctx, tx, userID)
 	if err != nil {
+		r.Log.Debug("Repo.SelectUser, r.selectUserTx()", err)
 		return err
 	}
 
 	err = tx.Commit(ctx)
 	if err != nil {
+		r.Log.Debug("Repo.SelectUser, tx.Commit()", err)
+
 		errRollback := tx.Rollback(ctx)
 		if errRollback != nil {
+			r.Log.Debug("Repo.SelectUser, tx.Rollback()", errRollback)
+
 			return errRollback
 		}
+
 		return err
 	}
 
@@ -65,15 +72,16 @@ func (r *Repo) selectUserTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID) er
 		ToSql()
 
 	if err != nil {
+		r.Log.Debug("Repo.selectUserTx, r.Builder.Select()", err)
 		return err
 	}
 
 	var selectedUserID uuid.UUID
 	err = tx.QueryRow(ctx, sql, args...).Scan(&selectedUserID)
 	if err != nil {
-		r.Log.Debugf("err: %v", err)
+		r.Log.Debug("Repo.selectUserTx, r.Builder.Select()", err)
+
 		if ok := errors.Is(err, pgx.ErrNoRows); ok {
-			r.Log.Debugf(pgx.ErrNoRows.Error())
 			return repoerrs.ErrNotFound
 		}
 
@@ -94,6 +102,7 @@ func (r *Repo) SelectSegmentID(ctx context.Context, slug string) (id uuid.UUID, 
 
 	conn, err = r.Pool.Acquire(ctx)
 	if err != nil {
+		r.Log.Debug("Repo.SelectSegmentID, r.Pool.Acquire()", err)
 		return uuid.UUID{}, err
 	}
 	defer conn.Release()
@@ -103,21 +112,26 @@ func (r *Repo) SelectSegmentID(ctx context.Context, slug string) (id uuid.UUID, 
 		AccessMode: pgx.ReadOnly,
 	})
 	if err != nil {
-		r.Log.Error(err)
+		r.Log.Debug("Repo.SelectSegmentID, r.Pool.BeginTx()", err)
 		return id, repoerrs.ErrDB
 	}
 
 	id, err = r.selectSegmentTx(ctx, tx, slug)
 	if err != nil {
+		r.Log.Debug("Repo.SelectSegmentID, r.selectSegmentTx()", err)
 		return uuid.UUID{}, err
 	}
 
 	err = tx.Commit(ctx)
 	if err != nil {
+		r.Log.Debug("Repo.SelectSegmentID, tx.Commit()", err)
+
 		errRollback := tx.Rollback(ctx)
 		if errRollback != nil {
+			r.Log.Debug("Repo.SelectSegmentID,tx.Rollback()", err)
 			return uuid.UUID{}, errRollback
 		}
+
 		return uuid.UUID{}, err
 	}
 
@@ -130,6 +144,7 @@ func (r *Repo) SelectActiveUserSegments(ctx context.Context, userID uuid.UUID) (
 
 	conn, err := r.Pool.Acquire(ctx)
 	if err != nil {
+		r.Log.Debug("Repo.SelectActiveUserSegments, r.Pool.Acquire()", err)
 		return nil, err
 	}
 	defer conn.Release()
@@ -139,6 +154,10 @@ func (r *Repo) SelectActiveUserSegments(ctx context.Context, userID uuid.UUID) (
 		Join("public.segments s ON s.id = su.segment_id").
 		Where(squirrel.Eq{"user_id": userID}).
 		ToSql()
+	if err != nil {
+		r.Log.Debug("Repo.SelectActiveUserSegments, r.Builder.Select()", err)
+		return nil, err
+	}
 
 	slugs = make([]string, 0, 0)
 
@@ -147,12 +166,13 @@ func (r *Repo) SelectActiveUserSegments(ctx context.Context, userID uuid.UUID) (
 		IsoLevel:   pgx.RepeatableRead,
 	})
 	if err != nil {
+		r.Log.Debug("Repo.SelectActiveUserSegments, conn.BeginTx()", err)
 		return nil, err
 	}
 
 	rows, err := tx.Query(ctx, sql, args...)
 	if err != nil {
-		r.Log.Debugf("err: %v", err)
+		r.Log.Debug("Repo.SelectActiveUserSegments, tx.Query()", err)
 
 		var pgErr *pgconn.PgError
 		if ok := errors.As(err, &pgErr); ok {
@@ -160,15 +180,16 @@ func (r *Repo) SelectActiveUserSegments(ctx context.Context, userID uuid.UUID) (
 				return nil, repoerrs.ErrAlreadyExists
 			}
 		}
+
 		return nil, fmt.Errorf("UserRepo.CreateUser - r.Pool.QueryRow: %v", err)
 	}
-
 	defer rows.Close()
 
 	for rows.Next() {
 		var n string
 		err = rows.Scan(&n)
 		if err != nil {
+			r.Log.Debug("Repo.SelectActiveUserSegments, rows.Scan()", err)
 			return nil, err
 		}
 		slugs = append(slugs, n)
@@ -176,10 +197,14 @@ func (r *Repo) SelectActiveUserSegments(ctx context.Context, userID uuid.UUID) (
 
 	err = tx.Commit(ctx)
 	if err != nil {
+		r.Log.Debug("Repo.SelectActiveUserSegments, tx.Commit()", err)
+
 		errRollback := tx.Rollback(ctx)
 		if errRollback != nil {
+			r.Log.Debug("Repo.SelectActiveUserSegments, tx.Rollback()", errRollback)
 			return nil, errRollback
 		}
+
 		return nil, err
 	}
 
@@ -192,6 +217,7 @@ func (r *Repo) SelectReport(ctx context.Context, input userDTO.ReportInput) (rep
 
 	conn, err := r.Pool.Acquire(ctx)
 	if err != nil {
+		r.Log.Debug("Repo.SelectReport, r.Pool.Acquire()", err)
 		return nil, err
 	}
 	defer conn.Release()
@@ -201,21 +227,26 @@ func (r *Repo) SelectReport(ctx context.Context, input userDTO.ReportInput) (rep
 		AccessMode: pgx.ReadOnly,
 	})
 	if err != nil {
-		r.Log.Error(err)
+		r.Log.Debug("Repo.SelectReport, conn.BeginTx()", err)
 		return nil, repoerrs.ErrDB
 	}
 
 	reports, err = r.selectReportTx(ctx, tx, input)
 	if err != nil {
+		r.Log.Debug("Repo.SelectReport, r.selectReportTx()", err)
 		return nil, err
 	}
 
 	err = tx.Commit(ctx)
 	if err != nil {
+		r.Log.Debug("Repo.SelectReport, tx.Commit()", err)
+
 		errRollback := tx.Rollback(ctx)
 		if errRollback != nil {
+			r.Log.Debug("Repo.SelectReport, tx.Rollback()", err)
 			return nil, errRollback
 		}
+
 		return nil, err
 	}
 
@@ -228,11 +259,13 @@ func (r *Repo) SelectSegment(ctx context.Context, tx pgx.Tx, data userDTO.TTLTx)
 		Where(squirrel.LtOrEq{"ttl": data.TTL}).
 		ToSql()
 	if err != nil {
+		r.Log.Debug("Repo.SelectActiveUserSegments, r.Builder.Select()", err)
 		return nil, err
 	}
 
 	rows, err := tx.Query(ctx, sql, args...)
 	if err != nil {
+		r.Log.Debug("Repo.SelectActiveUserSegments, tx.Query()", err)
 		return nil, err
 	}
 
@@ -240,9 +273,12 @@ func (r *Repo) SelectSegment(ctx context.Context, tx pgx.Tx, data userDTO.TTLTx)
 
 	for rows.Next() {
 		var result userDTO.TTLTxR
+
 		if err := rows.Scan(&result.UserID, &result.SegmentID); err != nil {
+			r.Log.Debug("Repo.SelectActiveUserSegments, rows.Scan()", err)
 			return nil, err
 		}
+
 		results = append(results, result)
 	}
 	defer rows.Close()
@@ -256,16 +292,17 @@ func (r *Repo) selectSegmentTx(ctx context.Context, tx pgx.Tx, slug string) (uui
 		Where(squirrel.Eq{"slug": slug}).
 		ToSql()
 	if err != nil {
+		r.Log.Debug("Repo.SelectActiveUserSegments, r.Builder.Select()", err)
 		return uuid.UUID{}, err
 	}
 
 	var selectedSegmentID uuid.UUID
+
 	err = tx.QueryRow(ctx, sql, args...).Scan(&selectedSegmentID)
 	if err != nil {
-		r.Log.Debugf("err: %v", err)
+		r.Log.Debug("Repo.SelectActiveUserSegments, tx.QueryRow()", err)
 
 		if ok := errors.Is(err, pgx.ErrNoRows); ok {
-			r.Log.Debugf(pgx.ErrNoRows.Error())
 			return uuid.UUID{}, fmt.Errorf("segment with slug: %s %s", slug, repoerrs.ErrNotFound)
 		}
 
@@ -283,14 +320,14 @@ func (r *Repo) selectReportTx(ctx context.Context, tx pgx.Tx, input userDTO.Repo
 		From("operations_outbox").
 		Where(squirrel.Eq{"user_id": input.UserID}, " AND operation_at > ", operationAt).
 		ToSql()
-
 	if err != nil {
+		r.Log.Debug("Repo.SelectActiveUserSegments, r.Builder.Select()", err)
 		return nil, err
 	}
 
 	rows, err := tx.Query(ctx, sql, args...)
 	if err != nil {
-		r.Log.Debugf("err: %v", err)
+		r.Log.Debug("Repo.SelectActiveUserSegments, tx.Query()", err)
 
 		if ok := errors.Is(err, pgx.ErrNoRows); ok {
 			r.Log.Debugf(pgx.ErrNoRows.Error())
@@ -305,10 +342,14 @@ func (r *Repo) selectReportTx(ctx context.Context, tx pgx.Tx, input userDTO.Repo
 
 	for rows.Next() {
 		var report userDTO.Report
+
 		if err := rows.Scan(&report.ID, &report.UserID, &report.Segment,
 			&report.Operation, &report.OperationAt); err != nil {
+			r.Log.Debug("Repo.SelectActiveUserSegments, rows.Scan()", err)
+
 			return nil, err
 		}
+
 		reports = append(reports, report)
 	}
 
@@ -318,6 +359,7 @@ func (r *Repo) selectReportTx(ctx context.Context, tx pgx.Tx, input userDTO.Repo
 func (r *Repo) SelectSegmentTTL(ctx context.Context, tx pgx.Tx, data userDTO.TTLTx) (results []userDTO.TTLTxR, err error) {
 	ttl, err := time.Parse(time.RFC3339, data.TTL)
 	if err != nil {
+		r.Log.Debug("Repo.SelectSegmentTTL, time.Parse()", err)
 		return nil, err
 	}
 
@@ -329,11 +371,13 @@ func (r *Repo) SelectSegmentTTL(ctx context.Context, tx pgx.Tx, data userDTO.TTL
 		Join("public.segments s ON s.id = t.segment_id").
 		ToSql()
 	if err != nil {
+		r.Log.Debug("Repo.SelectSegmentTTL, r.Builder.Select()", err)
 		return nil, err
 	}
 
 	rows, err := tx.Query(ctx, sql, args...)
 	if err != nil {
+		r.Log.Debug("Repo.SelectSegmentTTL, tx.Query()", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -343,6 +387,8 @@ func (r *Repo) SelectSegmentTTL(ctx context.Context, tx pgx.Tx, data userDTO.TTL
 	for rows.Next() {
 		var result userDTO.TTLTxR
 		if err := rows.Scan(&result.UserID, &result.SegmentID, &result.Slug); err != nil {
+			r.Log.Debug("Repo.SelectSegmentTTL, rows.Scan()", err)
+
 			return nil, err
 		}
 		results = append(results, result)
@@ -354,6 +400,7 @@ func (r *Repo) SelectSegmentTTL(ctx context.Context, tx pgx.Tx, data userDTO.TTL
 func (r *Repo) TTLMarkDone(ctx context.Context, tx pgx.Tx, data userDTO.TTLTx) (err error) {
 	ttl, err := time.Parse(time.RFC3339, data.TTL)
 	if err != nil {
+		r.Log.Debug("Repo.TTLMarkDone, time.Parse()", err)
 		return err
 	}
 
@@ -363,11 +410,13 @@ func (r *Repo) TTLMarkDone(ctx context.Context, tx pgx.Tx, data userDTO.TTLTx) (
 		Where(squirrel.LtOrEq{"ttl": ttl}).
 		ToSql()
 	if err != nil {
+		r.Log.Debug("Repo.TTLMarkDone, r.Builder.Update()", err)
 		return err
 	}
 
 	_, err = tx.Exec(ctx, sql, args...)
 	if err != nil {
+		r.Log.Debug("Repo.TTLMarkDone, tx.Exec()", err)
 		return err
 	}
 
