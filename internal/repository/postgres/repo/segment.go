@@ -20,6 +20,7 @@ func (r *Repo) TotalUserCount(ctx context.Context, operation dtoSegment.Operatio
 
 	conn, err := r.Pool.Acquire(ctx)
 	if err != nil {
+		r.Log.Debug("Repo.TotalUserCount, r.Pool.Acquire()", err)
 		return dtoSegment.Total{}, err
 	}
 	defer func() {
@@ -32,6 +33,7 @@ func (r *Repo) TotalUserCount(ctx context.Context, operation dtoSegment.Operatio
 		GroupBy("id").
 		ToSql()
 	if err != nil {
+		r.Log.Debug("Repo.TotalUserCount, r.Builder.Select()", err)
 		return dtoSegment.Total{}, err
 	}
 
@@ -44,7 +46,7 @@ func (r *Repo) TotalUserCount(ctx context.Context, operation dtoSegment.Operatio
 
 	row, err := tx.Query(ctx, sql, args...)
 	if err != nil {
-		r.Log.Debugf("err: %v", err)
+		r.Log.Debug("Repo.TotalUserCount, tx.Query()", err)
 		return dtoSegment.Total{}, repoerrs.ErrDB
 	}
 	defer row.Close()
@@ -57,14 +59,17 @@ func (r *Repo) TotalUserCount(ctx context.Context, operation dtoSegment.Operatio
 		}
 		result.UserIDs = append(result.UserIDs, userID)
 	}
+	defer row.Close()
 
 	result.TotalCount = len(result.UserIDs)
 
 	if !tx.Conn().IsClosed() {
 		err = tx.Commit(ctx)
 		if err != nil {
+			r.Log.Debug("Repo.TotalUserCount, tx.Commit()", err)
 			errRollback := tx.Rollback(ctx)
 			if errRollback != nil {
+				r.Log.Debug("Repo.DeleteSegment, tx.Rollback()", errRollback)
 				return dtoSegment.Total{}, errRollback
 			}
 			return dtoSegment.Total{}, err
@@ -80,6 +85,7 @@ func (r *Repo) CreateSegment(ctx context.Context, tx pgx.Tx, operation dtoSegmen
 
 	conn, err := r.Pool.Acquire(ctx)
 	if err != nil {
+		r.Log.Debug("Repo.CreateSegment, r.Pool.Acquire()", err)
 		return uuid.UUID{}, err
 	}
 	defer func() {
@@ -93,12 +99,13 @@ func (r *Repo) CreateSegment(ctx context.Context, tx pgx.Tx, operation dtoSegmen
 		Suffix("RETURNING id").
 		ToSql()
 	if err != nil {
+		r.Log.Debug("Repo.CreateSegment, r.Builder.Insert()", err)
 		return uuid.UUID{}, err
 	}
 
 	err = tx.QueryRow(ctx, sql, args...).Scan(&segmentID)
 	if err != nil {
-		r.Log.Debugf("err: %v", err)
+		r.Log.Debug("Repo.CreateSegment, tx.QueryRow()", err)
 
 		var pgErr *pgconn.PgError
 		if ok := errors.As(err, &pgErr); ok {
@@ -107,6 +114,7 @@ func (r *Repo) CreateSegment(ctx context.Context, tx pgx.Tx, operation dtoSegmen
 				return uuid.UUID{}, fmt.Errorf("slug with name: '%s' %s", operation.Segment, msg)
 			}
 		}
+
 		return uuid.UUID{}, repoerrs.ErrDB
 	}
 
@@ -126,12 +134,14 @@ func (r *Repo) AddSegmentToOperationsOutboxTx(ctx context.Context, tx pgx.Tx, op
 		Suffix("RETURNING id").
 		ToSql()
 	if err != nil {
+		r.Log.Debug("Repo.AddSegmentToOperationsOutboxTx, r.Builder.Insert()", err)
 		return uuid.UUID{}, err
 	}
 
-	// Insert
 	err = tx.QueryRow(ctx, sql, args...).Scan(&operationID)
 	if err != nil {
+		r.Log.Debug("Repo.AddSegmentToOperationsOutboxTx, tx.QueryRow()", err)
+
 		var errMsg string
 
 		var pgErr *pgconn.PgError
@@ -147,7 +157,6 @@ func (r *Repo) AddSegmentToOperationsOutboxTx(ctx context.Context, tx pgx.Tx, op
 		}
 
 		if ok := errors.Is(err, pgx.ErrNoRows); ok {
-			r.Log.Debugf(pgx.ErrNoRows.Error())
 			return uuid.UUID{},
 				fmt.Errorf("operation: '%s' with segment name: '%s' for the user with id: %s: %s to add",
 					operation.Operation,
@@ -167,6 +176,7 @@ func (r *Repo) AddSegmentToOperationsOutboxTx(ctx context.Context, tx pgx.Tx, op
 func (r *Repo) DeleteSegment(ctx context.Context, operation userDTO.SegmentTx) (err error) {
 	conn, err := r.Pool.Acquire(ctx)
 	if err != nil {
+		r.Log.Debug("Repo.DeleteSegment, r.Pool.Acquire()", err)
 		return err
 	}
 	defer func() {
@@ -178,7 +188,7 @@ func (r *Repo) DeleteSegment(ctx context.Context, operation userDTO.SegmentTx) (
 		AccessMode: pgx.ReadWrite,
 	})
 	if err != nil {
-		r.Log.Error(err)
+		r.Log.Debug("Repo.DeleteSegment, conn.BeginTx()", err)
 		return repoerrs.ErrDB
 	}
 
@@ -198,15 +208,19 @@ func (r *Repo) DeleteSegment(ctx context.Context, operation userDTO.SegmentTx) (
 
 		rows, err := tx.Query(ctx, sql, args...)
 		if err != nil {
+			r.Log.Debug("Repo.DeleteSegment, tx.Query()", err)
 			return err
 		}
+
 		defer rows.Close()
+
 		for rows.Next() {
 			if err := rows.Scan(&segmentID, &operation.UserID); err != nil {
 				return err
 			}
 			operations = append(operations, operation)
 		}
+
 		if len(operations) == 0 {
 			return repoerrs.ErrDoesNotExist
 		}
@@ -218,11 +232,13 @@ func (r *Repo) DeleteSegment(ctx context.Context, operation userDTO.SegmentTx) (
 			Where(squirrel.Eq{"id": segmentID}).
 			ToSql()
 		if err != nil {
+			r.Log.Debug("Repo.DeleteSegment, r.Builder.Delete()", err)
 			return err
 		}
 
 		_, err = tx.Exec(ctx, sql, args...)
 		if err != nil {
+			r.Log.Debug("Repo.DeleteSegment, tx.Exec()", err)
 			return err
 		}
 	}
@@ -230,6 +246,7 @@ func (r *Repo) DeleteSegment(ctx context.Context, operation userDTO.SegmentTx) (
 	for _, operation := range operations {
 		_, err := r.AddSegmentToOperationsOutboxTx(ctx, tx, operation)
 		if err != nil {
+			r.Log.Debug("Repo.DeleteSegment, r.AddSegmentToOperationsOutboxTx()", err)
 			return err
 		}
 	}
@@ -237,8 +254,10 @@ func (r *Repo) DeleteSegment(ctx context.Context, operation userDTO.SegmentTx) (
 	if !tx.Conn().IsClosed() {
 		err = tx.Commit(ctx)
 		if err != nil {
+			r.Log.Debug("Repo.DeleteSegment, tx.Commit()", err)
 			errRollback := tx.Rollback(ctx)
 			if errRollback != nil {
+				r.Log.Debug("Repo.DeleteSegment, tx.Rollback()", errRollback)
 				return errRollback
 			}
 			return err

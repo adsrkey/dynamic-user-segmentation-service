@@ -22,11 +22,13 @@ func (r *Repo) CreateUser(ctx context.Context, userID uuid.UUID) error {
 		Suffix("RETURNING id").
 		ToSql()
 	if err != nil {
+		r.Log.Debug("Repo.CreateUser, r.Builder.Insert()", err)
 		return err
 	}
 
 	conn, err := r.Pool.Acquire(ctx)
 	if err != nil {
+		r.Log.Debug("Repo.CreateUser, r.Pool.Acquire()", err)
 		return err
 	}
 	defer func() {
@@ -38,14 +40,14 @@ func (r *Repo) CreateUser(ctx context.Context, userID uuid.UUID) error {
 		AccessMode: pgx.ReadWrite,
 	})
 	if err != nil {
-		r.Log.Error(err)
+		r.Log.Debug("Repo.CreateUser, conn.BeginTx()", err)
 		return repoerrs.ErrDB
 	}
 
 	var id uuid.UUID
 	err = tx.QueryRow(ctx, sql, args...).Scan(&id)
 	if err != nil {
-		r.Log.Debugf("err: %v", err)
+		r.Log.Debug("Repo.CreateUser, tx.QueryRow()", err)
 
 		var pgErr *pgconn.PgError
 		if ok := errors.As(err, &pgErr); ok {
@@ -59,9 +61,11 @@ func (r *Repo) CreateUser(ctx context.Context, userID uuid.UUID) error {
 
 	err = tx.Commit(ctx)
 	if err != nil {
+		r.Log.Debug("Repo.CreateUser, tx.Commit()", err)
 
 		errRollback := tx.Rollback(ctx)
 		if errRollback != nil {
+			r.Log.Debug("Repo.CreateUser, tx.Rollback()", err)
 			return errRollback
 		}
 

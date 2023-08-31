@@ -40,12 +40,12 @@ type Segment interface {
 	AddSegmentToOperationsOutboxTx(ctx context.Context, tx pgx.Tx, operation userDTO.SegmentTx) (operationID uuid.UUID, err error)
 }
 
-type SegmentTx interface {
-	SegmentTx(ctx context.Context, tx pgx.Tx, input userDTO.SegmentTx) (operation userDTO.Operation, err error)
-}
-
 type Pool interface {
 	GetPool() postgres.PgxPool
+}
+
+type SegmentTx interface {
+	SegmentTx(ctx context.Context, tx pgx.Tx, input userDTO.SegmentTx) (operation userDTO.Operation, err error)
 }
 
 type TTL interface {
