@@ -1,0 +1,315 @@
+definitions:
+  github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse:
+    properties:
+      message:
+        type: string
+    type: object
+  github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ReportResponse:
+    properties:
+      link:
+        type: string
+    type: object
+  github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.Response:
+    properties:
+      message:
+        type: string
+    type: object
+  github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_segment.SegmentAddInput:
+    properties:
+      percent:
+        type: integer
+      slug:
+        type: string
+    required:
+    - slug
+    type: object
+  github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_segment.SegmentDelInput:
+    properties:
+      slug:
+        type: string
+    required:
+    - slug
+    type: object
+  github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_user.AddToSegmentInput:
+    properties:
+      operationAt:
+        type: string
+      slugs_add:
+        items:
+          type: string
+        type: array
+      slugs_del:
+        items:
+          type: string
+        type: array
+      ttl:
+        type: string
+      user_id:
+        type: string
+    required:
+    - slugs_add
+    - slugs_del
+    - user_id
+    type: object
+  github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_user.GetActiveSegments:
+    properties:
+      user_id:
+        type: string
+    required:
+    - user_id
+    type: object
+  github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_user.GetActiveSegmentsResponse:
+    properties:
+      slugs:
+        items:
+          type: string
+        type: array
+      user_id:
+        type: string
+    type: object
+  github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_user.ReportInput:
+    properties:
+      month:
+        $ref: '#/definitions/time.Month'
+      user_id:
+        type: string
+      year:
+        type: integer
+    required:
+    - month
+    - user_id
+    - year
+    type: object
+  time.Month:
+    enum:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    type: integer
+    x-enum-varnames:
+    - January
+    - February
+    - March
+    - April
+    - May
+    - June
+    - July
+    - August
+    - September
+    - October
+    - November
+    - December
+info:
+  contact: {}
+paths:
+  /api/v1/segments:
+    delete:
+      consumes:
+      - application/json
+      description: delete segment
+      operationId: delete-segment
+      parameters:
+      - description: segment with slug
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_segment.SegmentDelInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+      summary: deleteSegment
+      tags:
+      - delete
+    post:
+      consumes:
+      - application/json
+      description: create segment
+      operationId: create-segment
+      parameters:
+      - description: segment with slug, percent(optional)
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_segment.SegmentAddInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+      summary: CreateSegment
+      tags:
+      - create
+  /api/v1/users/segments:
+    get:
+      consumes:
+      - application/json
+      description: get users active segments
+      operationId: get-user-segments
+      parameters:
+      - description: get active segments with user_id
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_user.GetActiveSegments'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_user.GetActiveSegmentsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+      summary: getActiveSegments
+      tags:
+      - active segments
+    post:
+      consumes:
+      - application/json
+      description: add user to segment
+      operationId: add-user-segment
+      parameters:
+      - description: segment with user_id, slugs_add, slugs_del and ttl (optional)
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_user.AddToSegmentInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+      summary: addToSegment
+      tags:
+      - add
+  /api/v1/users/segments/reports:
+    post:
+      consumes:
+      - application/json
+      description: get reports
+      operationId: get-reports
+      parameters:
+      - description: get reports with user_id, year, month
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_user.ReportInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ReportResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse'
+      summary: reports
+      tags:
+      - reports
+swagger: "2.0"

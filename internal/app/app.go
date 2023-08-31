@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/adsrkey/dynamic-user-segmentation-service/config"
+	_ "github.com/adsrkey/dynamic-user-segmentation-service/docs"
 	repository "github.com/adsrkey/dynamic-user-segmentation-service/internal/repository/postgres"
 	segmentUseCase "github.com/adsrkey/dynamic-user-segmentation-service/internal/segment/usecase"
 	"github.com/adsrkey/dynamic-user-segmentation-service/internal/server"
@@ -17,6 +18,7 @@ import (
 	"github.com/adsrkey/dynamic-user-segmentation-service/pkg/validator"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/gommon/log"
+	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
 func Run(cfg *config.Config) {
@@ -25,6 +27,9 @@ func Run(cfg *config.Config) {
 
 	// echo - http framework
 	e := echo.New()
+
+	// swagger
+	e.GET("/swagger/*", echoSwagger.WrapHandler)
 
 	// configuration logger
 	e.Logger.SetLevel(log.DEBUG)
@@ -79,7 +84,7 @@ func Run(cfg *config.Config) {
 
 	// HTTP server
 	log.Info("Starting http server...")
-	log.Debugf("Server port: %s", cfg.HTTP.Port)
+	log.Info("Server port: %s", cfg.HTTP.Port)
 
 	server := server.New(cfg.HTTP, e)
 

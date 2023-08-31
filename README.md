@@ -23,7 +23,12 @@ cd deploy/scripts/sql/up.sql
 
 #### Импортировать postman коллекцию
 ```
-dynamic-user-segmentation-service/postman/Task.postman_collection.json
+postman/Task.postman_collection.json
+```
+
+#### Swagger Документация
+```
+http://localhost:8080/swagger/index.html
 ```
 
 # Остановка:
