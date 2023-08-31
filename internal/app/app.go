@@ -84,7 +84,7 @@ func Run(cfg *config.Config) {
 
 	// HTTP server
 	log.Info("Starting http server...")
-	log.Debugf("Server port: %s", cfg.HTTP.Port)
+	log.Info("Server port: %s", cfg.HTTP.Port)
 
 	server := server.New(cfg.HTTP, e)
 
