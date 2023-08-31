@@ -1,8 +1,13 @@
 {
     "swagger": "2.0",
     "info": {
-        "contact": {}
+        "description": "Api Server for dynamic user segmentation",
+        "title": "Dynamic User Segmentation Service",
+        "contact": {},
+        "version": "1.0"
     },
+    "host": "localhost:8080",
+    "basePath": "/health",
     "paths": {
         "/api/v1/segments": {
             "post": {

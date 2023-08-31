@@ -7,7 +7,7 @@ import (
 	"github.com/adsrkey/dynamic-user-segmentation-service/internal/app"
 )
 
-// @title Dynamic User Segmentation API
+// @title Dynamic User Segmentation Service
 // @version 1.0
 // @description Api Server for dynamic user segmentation
 

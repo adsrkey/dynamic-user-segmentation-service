@@ -480,12 +480,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "",
-	Host:             "",
-	BasePath:         "",
+	Version:          "1.0",
+	Host:             "localhost:8080",
+	BasePath:         "/health",
 	Schemes:          []string{},
-	Title:            "",
-	Description:      "",
+	Title:            "Dynamic User Segmentation Service",
+	Description:      "Api Server for dynamic user segmentation",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

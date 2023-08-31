@@ -1,3 +1,4 @@
+basePath: /health
 definitions:
   github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse:
     properties:
@@ -108,8 +109,12 @@ definitions:
     - October
     - November
     - December
+host: localhost:8080
 info:
   contact: {}
+  description: Api Server for dynamic user segmentation
+  title: Dynamic User Segmentation Service
+  version: "1.0"
 paths:
   /api/v1/segments:
     delete:
