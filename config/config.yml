@@ -1,0 +1,17 @@
+app:
+  name: 'dynamic-user-segmentation-service'
+  version: '1.0.0'
+
+http:
+  host: '0.0.0.0' # inside docker
+  port: '8080'
+
+job:
+  ttl_worker_timeout: 60 #seconds
+
+logger:
+  log_level: 'debug'
+  rollbar_env: 'dynamic-user-segmentation-service'
+
+postgres:
+  pool_max: 20
