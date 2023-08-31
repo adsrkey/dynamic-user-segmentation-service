@@ -55,6 +55,17 @@ func contains(elems []string, v string) bool {
 	return false
 }
 
+// @Summary addToSegment
+// @Tags add
+// @Description add user to segment
+// @ID add-user-segment
+// @Accept json
+// @Produce json
+// @Param input body dto.AddToSegmentInput true "segment with user_id, slugs_add, slugs_del and ttl (optional)"
+// @Success 201 {object} response.Response
+// @Failure 400,404,409,422 {object} response.ErrResponse
+// @Failure 500 {object} response.ErrResponse
+// @Router /api/v1/users/segments [post]
 func (h *handler) addToSegment(c echo.Context) (err error) {
 	var (
 		now = time.Now()
@@ -78,7 +89,9 @@ func (h *handler) addToSegment(c echo.Context) (err error) {
 	// Validate
 	err = ValidateAddToSegmentInput(c, &input)
 	if err != nil {
-		return err
+		return c.JSON(http.StatusUnprocessableEntity, response.ErrResponse{
+			Message: routeerrs.ErrNotDecodeJSONData.Error(),
+		})
 	}
 	input.OperationAt = now
 
@@ -138,12 +151,22 @@ func (h *handler) addToSegment(c echo.Context) (err error) {
 		return
 	}
 
-	c.JSON(http.StatusOK, response.Response{
+	return c.JSON(http.StatusCreated, response.Response{
 		Message: "success",
 	})
-	return
 }
 
+// @Summary getActiveSegments
+// @Tags active segments
+// @Description get users active segments
+// @ID get-user-segments
+// @Accept json
+// @Produce json
+// @Param input body dto.GetActiveSegments true "get active segments with user_id"
+// @Success 200 {object} dto.GetActiveSegmentsResponse
+// @Failure 400,404,422 {object} response.ErrResponse
+// @Failure 500 {object} response.ErrResponse
+// @Router /api/v1/users/segments [get]
 func (h *handler) getActiveSegments(c echo.Context) (err error) {
 	var (
 		// context
@@ -166,7 +189,9 @@ func (h *handler) getActiveSegments(c echo.Context) (err error) {
 	// Validate
 	err = ValidateGetActiveSegmentsInput(c, &input)
 	if err != nil {
-		return err
+		return c.JSON(http.StatusUnprocessableEntity, response.ErrResponse{
+			Message: routeerrs.ErrNotDecodeJSONData.Error(),
+		})
 	}
 
 	var (
@@ -176,19 +201,17 @@ func (h *handler) getActiveSegments(c echo.Context) (err error) {
 	slugs, err = h.uc.GetActiveSegments(ctx, input.UserID)
 	if err != nil {
 		if errors.Is(err, repoerrs.ErrDB) {
-			return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			return c.JSON(http.StatusInternalServerError, response.ErrResponse{
 				Message: "InternalServerError",
 			})
 		}
 	}
 
 	if len(slugs) == 0 {
-		return c.JSON(http.StatusNotFound, dto.ErrorResponse{
+		return c.JSON(http.StatusNotFound, response.ErrResponse{
 			Message: "no active segments",
 		})
 	}
-
-	time.Sleep(1 * time.Minute)
 
 	return c.JSON(http.StatusOK, dto.GetActiveSegmentsResponse{
 		UserID: input.UserID,
@@ -196,6 +219,17 @@ func (h *handler) getActiveSegments(c echo.Context) (err error) {
 	})
 }
 
+// @Summary reports
+// @Tags reports
+// @Description get reports
+// @ID get-reports
+// @Accept json
+// @Produce json
+// @Param input body dto.ReportInput true "get reports with user_id, year, month"
+// @Success 201 {object} response.ReportResponse
+// @Failure 400,404,422 {object} response.ErrResponse
+// @Failure 500 {object} response.ErrResponse
+// @Router /api/v1/users/segments/reports [post]
 func (h *handler) reports(c echo.Context) (err error) {
 	var (
 		// context
@@ -218,7 +252,9 @@ func (h *handler) reports(c echo.Context) (err error) {
 	// Validate
 	err = ValidateReportInput(c, &input)
 	if err != nil {
-		return err
+		return c.JSON(http.StatusUnprocessableEntity, response.ErrResponse{
+			Message: routeerrs.ErrNotDecodeJSONData.Error(),
+		})
 	}
 
 	reports, err := h.uc.Reports(ctx, input)

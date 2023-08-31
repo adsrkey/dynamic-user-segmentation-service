@@ -37,6 +37,17 @@ func New(
 	return h
 }
 
+// @Summary CreateSegment
+// @Tags create
+// @Description create segment
+// @ID create-segment
+// @Accept json
+// @Produce json
+// @Param input body segmentDTO.SegmentAddInput true "segment with slug, percent(optional)"
+// @Success 201 {object} response.Response
+// @Failure 400,409,422 {object} response.ErrResponse
+// @Failure 500 {object} response.ErrResponse
+// @Router /api/v1/segments [post]
 func (r *handler) create(c echo.Context) (err error) {
 	var (
 		now = time.Now()
@@ -57,9 +68,12 @@ func (r *handler) create(c echo.Context) (err error) {
 			Message: handler_errors.ErrNotDecodeJSONData.Error(),
 		})
 	}
+
 	err = ValidateSegmentAddInput(c, &input)
 	if err != nil {
-		return err
+		return c.JSON(http.StatusUnprocessableEntity, response.ErrResponse{
+			Message: err.Error(),
+		})
 	}
 
 	var process string
@@ -93,9 +107,22 @@ func (r *handler) create(c echo.Context) (err error) {
 		})
 	}
 
-	return Success(c)
+	return c.JSON(http.StatusCreated, response.Response{
+		Message: "success",
+	})
 }
 
+// @Summary deleteSegment
+// @Tags delete
+// @Description delete segment
+// @ID delete-segment
+// @Accept json
+// @Produce json
+// @Param input body segmentDTO.SegmentDelInput true "segment with slug"
+// @Success 200 {object} response.Response
+// @Failure 400,404,409,422 {object} response.ErrResponse
+// @Failure 500 {object} response.ErrResponse
+// @Router /api/v1/segments [delete]
 func (r *handler) delete(c echo.Context) (err error) {
 	var (
 		now = time.Now()
@@ -117,7 +144,9 @@ func (r *handler) delete(c echo.Context) (err error) {
 	}
 	err = ValidateSegmentDelInput(c, &input)
 	if err != nil {
-		return err
+		return c.JSON(http.StatusUnprocessableEntity, response.ErrResponse{
+			Message: err.Error(),
+		})
 	}
 
 	operation := userDTO.SegmentTx{
@@ -138,11 +167,7 @@ func (r *handler) delete(c echo.Context) (err error) {
 		})
 	}
 
-	return Success(c)
-}
-
-func Success(c echo.Context) error {
-	return c.JSON(http.StatusCreated, response.Response{
+	return c.JSON(http.StatusOK, response.Response{
 		Message: "success",
 	})
 }

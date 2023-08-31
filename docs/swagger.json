@@ -1,0 +1,468 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "contact": {}
+    },
+    "paths": {
+        "/api/v1/segments": {
+            "post": {
+                "description": "create segment",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "create"
+                ],
+                "summary": "CreateSegment",
+                "operationId": "create-segment",
+                "parameters": [
+                    {
+                        "description": "segment with slug, percent(optional)",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_segment.SegmentAddInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "delete segment",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "delete"
+                ],
+                "summary": "deleteSegment",
+                "operationId": "delete-segment",
+                "parameters": [
+                    {
+                        "description": "segment with slug",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_segment.SegmentDelInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/users/segments": {
+            "get": {
+                "description": "get users active segments",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "active segments"
+                ],
+                "summary": "getActiveSegments",
+                "operationId": "get-user-segments",
+                "parameters": [
+                    {
+                        "description": "get active segments with user_id",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_user.GetActiveSegments"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_user.GetActiveSegmentsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "add user to segment",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "add"
+                ],
+                "summary": "addToSegment",
+                "operationId": "add-user-segment",
+                "parameters": [
+                    {
+                        "description": "segment with user_id, slugs_add, slugs_del and ttl (optional)",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_user.AddToSegmentInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/users/segments/reports": {
+            "post": {
+                "description": "get reports",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "reports"
+                ],
+                "summary": "reports",
+                "operationId": "get-reports",
+                "parameters": [
+                    {
+                        "description": "get reports with user_id, year, month",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_user.ReportInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ReportResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ErrResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.ReportResponse": {
+            "type": "object",
+            "properties": {
+                "link": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler.Response": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_segment.SegmentAddInput": {
+            "type": "object",
+            "required": [
+                "slug"
+            ],
+            "properties": {
+                "percent": {
+                    "type": "integer"
+                },
+                "slug": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_segment.SegmentDelInput": {
+            "type": "object",
+            "required": [
+                "slug"
+            ],
+            "properties": {
+                "slug": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_user.AddToSegmentInput": {
+            "type": "object",
+            "required": [
+                "slugs_add",
+                "slugs_del",
+                "user_id"
+            ],
+            "properties": {
+                "operationAt": {
+                    "type": "string"
+                },
+                "slugs_add": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "slugs_del": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "ttl": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_user.GetActiveSegments": {
+            "type": "object",
+            "required": [
+                "user_id"
+            ],
+            "properties": {
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_user.GetActiveSegmentsResponse": {
+            "type": "object",
+            "properties": {
+                "slugs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_adsrkey_dynamic-user-segmentation-service_internal_dto_handler_user.ReportInput": {
+            "type": "object",
+            "required": [
+                "month",
+                "user_id",
+                "year"
+            ],
+            "properties": {
+                "month": {
+                    "$ref": "#/definitions/time.Month"
+                },
+                "user_id": {
+                    "type": "string"
+                },
+                "year": {
+                    "type": "integer"
+                }
+            }
+        },
+        "time.Month": {
+            "type": "integer",
+            "enum": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12
+            ],
+            "x-enum-varnames": [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ]
+        }
+    }
+}
