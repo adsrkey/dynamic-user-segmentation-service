@@ -14,6 +14,7 @@ type (
 		HTTP `yaml:"http"`
 		Log  `yaml:"logger"`
 		PG   `yaml:"postgres"`
+		Job  `yaml:"job"`
 	}
 
 	// App -.
@@ -38,6 +39,11 @@ type (
 	PG struct {
 		PoolMax int    `env-required:"true" yaml:"pool_max" env:"PG_POOL_MAX"`
 		URL     string `env-required:"true"                 env:"PG_URL"`
+	}
+
+	// Job -.
+	Job struct {
+		TTLWorkerTimeout int `env-required:"true" yaml:"ttl_worker_timeout"    env:"TTL_WORKER_TIMEOUT"`
 	}
 )
 

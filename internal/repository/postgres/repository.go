@@ -1,8 +1,7 @@
 package repository
 
 import (
-	segmentRepo "github.com/adsrkey/dynamic-user-segmentation-service/internal/segment/repo"
-	userRepo "github.com/adsrkey/dynamic-user-segmentation-service/internal/user/repo"
+	"github.com/adsrkey/dynamic-user-segmentation-service/internal/repository/postgres/repo"
 	"github.com/adsrkey/dynamic-user-segmentation-service/pkg/postgres"
 )
 
@@ -13,7 +12,7 @@ type Repositories struct {
 
 func New(pg *postgres.Postgres) *Repositories {
 	return &Repositories{
-		User:    userRepo.New(pg),
-		Segment: segmentRepo.New(pg),
+		User:    repo.New(pg),
+		Segment: repo.New(pg),
 	}
 }

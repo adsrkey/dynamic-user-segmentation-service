@@ -1,7 +1,6 @@
-package user
+package repo
 
 import (
-	worker "github.com/adsrkey/dynamic-user-segmentation-service/internal/user/worker/operation"
 	"github.com/adsrkey/dynamic-user-segmentation-service/pkg/postgres"
 )
 
@@ -13,13 +12,8 @@ const (
 
 type Repo struct {
 	*postgres.Postgres
-	worker *worker.OperationWorker
 }
 
 func New(pg *postgres.Postgres) *Repo {
-	return &Repo{pg, worker.New(pg.Pool, pg.Log)}
-}
-
-func (r *Repo) Worker() *worker.OperationWorker {
-	return r.worker
+	return &Repo{pg}
 }

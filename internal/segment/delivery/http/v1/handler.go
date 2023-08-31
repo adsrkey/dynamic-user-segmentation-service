@@ -37,35 +37,43 @@ func New(
 	return h
 }
 
-// create. -
 func (r *handler) create(c echo.Context) (err error) {
 	var (
 		now = time.Now()
+
 		// context
-		timeout     = 1 * time.Second
+		timeout     = 5 * time.Second
 		ctx, cancel = context.WithTimeout(c.Request().Context(), timeout)
 
 		// request body dto
-		input segmentDTO.SlugInput
+		input segmentDTO.SegmentAddInput
 	)
 
 	defer cancel()
 
-	err = BindSlugInput(c, &input)
+	err = BindSegmentAddInput(c, &input)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, response.ErrResponse{
 			Message: handler_errors.ErrNotDecodeJSONData.Error(),
 		})
 	}
-	err = ValidateSlugInput(c, &input)
+	err = ValidateSegmentAddInput(c, &input)
 	if err != nil {
 		return err
 	}
 
-	operation := userDTO.Operation{
+	var process string
+	if input.Percent != 0 {
+		process = segmentDTO.CreateAutoProcess
+	} else {
+		process = segmentDTO.CreateProcess
+	}
+
+	operation := segmentDTO.Operation{
 		Segment:     input.Slug,
 		OperationAt: now,
-		Operation:   segmentDTO.DeleteProcess,
+		Operation:   process,
+		Percent:     input.Percent,
 	}
 
 	_, err = r.uc.Create(ctx, operation)
@@ -73,6 +81,11 @@ func (r *handler) create(c echo.Context) (err error) {
 		if errors.Is(err, usecase_errors.ErrDB) {
 			return c.JSON(http.StatusInternalServerError, response.ErrResponse{
 				Message: "InternalServerError",
+			})
+		}
+		if errors.Is(err, usecase_errors.ToFewUsers) {
+			return c.JSON(http.StatusBadRequest, response.ErrResponse{
+				Message: err.Error(),
 			})
 		}
 		return c.JSON(http.StatusConflict, response.ErrResponse{
@@ -87,30 +100,30 @@ func (r *handler) delete(c echo.Context) (err error) {
 	var (
 		now = time.Now()
 		// context
-		timeout     = 5 * time.Minute
+		timeout     = 5 * time.Second
 		ctx, cancel = context.WithTimeout(c.Request().Context(), timeout)
 
 		// request body dto
-		input segmentDTO.SlugInput
+		input segmentDTO.SegmentDelInput
 	)
 
 	defer cancel()
 
-	err = BindSlugInput(c, &input)
+	err = BindSegmentDelInput(c, &input)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, response.ErrResponse{
 			Message: handler_errors.ErrNotDecodeJSONData.Error(),
 		})
 	}
-	err = ValidateSlugInput(c, &input)
+	err = ValidateSegmentDelInput(c, &input)
 	if err != nil {
 		return err
 	}
 
-	operation := userDTO.Operation{
-		Segment:     input.Slug,
-		OperationAt: now,
-		Operation:   segmentDTO.DeleteProcess,
+	operation := userDTO.SegmentTx{
+		Slug:      input.Slug,
+		CreatedAt: now,
+		Operation: segmentDTO.DeleteProcess,
 	}
 
 	err = r.uc.Delete(ctx, operation)

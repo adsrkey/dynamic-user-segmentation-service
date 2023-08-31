@@ -1,0 +1,310 @@
+{
+	"info": {
+		"_postman_id": "84c7a469-c3e4-4293-9b7e-0e886bba73c8",
+		"name": "Task",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17949940",
+		"_collection_link": "https://lionslight.postman.co/workspace/My-Workspace~9deeb9c6-e772-43e3-82f8-6888b5c48006/collection/17949940-84c7a469-c3e4-4293-9b7e-0e886bba73c8?action=share&source=collection_link&creator=17949940"
+	},
+	"item": [
+		{
+			"name": "Create segment",
+			"protocolProfileBehavior": {
+				"disabledSystemHeaders": {}
+			},
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"slug\": \"AVITO_INFO\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/v1/segments",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"segments"
+					]
+				},
+				"description": "Добавляет сегмент с полем slug в базу данных.\n\n\"slug\" - название сегмента"
+			},
+			"response": []
+		},
+		{
+			"name": "Create segment with percent",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"slug\": \"AVITO_VOICE_MESSAGES\",\n    \"percent\": 10\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/v1/segments",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"segments"
+					]
+				},
+				"description": "Добавляет сегмент с названием в базу данных.\n\n\"slug\" - название сегмента,\n\n\"percent\" (optional) - процент пользователей которые будут попадать в сегмент автоматически"
+			},
+			"response": []
+		},
+		{
+			"name": "Delete segment",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"slug\": \"AVITO_INFO\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/v1/segments",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"segments"
+					]
+				},
+				"description": "Удаление сегмента\n\n\"slug\" - название сегмента"
+			},
+			"response": []
+		},
+		{
+			"name": "Add user to the segment",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"user_id\":\"11111111-1234-5678-1234-567812345678\",\n    \"slugs_add\":[\"AVITO_INFO\",\"AVITO_PROPOSAL\"],\n    \"slugs_del\":[]\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/v1/users/segments/files?file_id=1d677e4c-79d0-4d78-9c79-807c098e0030",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"users",
+						"segments",
+						"files"
+					],
+					"query": [
+						{
+							"key": "file_id",
+							"value": "1d677e4c-79d0-4d78-9c79-807c098e0030"
+						}
+					]
+				},
+				"description": "Добавление пользователя в сегменn\n\n\"user_id\" - id пользователя в формате UUID,\n\n\"slugs_add\" - список названий сегментов для добавления,\n\n\"slugs_del\" - список названий сегментов для удаления"
+			},
+			"response": []
+		},
+		{
+			"name": "Add user to the segment with TTL",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"user_id\":\"11111111-1234-5678-1234-567812345678\",\n    \"slugs_add\":[\"AVITO_INFO\",\"AVITO_PROPOSAL\"],\n    \"slugs_del\":[],\n    \"ttl\": \"2023-08-30T21:15:00.000Z\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/v1/users/segments",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"users",
+						"segments"
+					]
+				},
+				"description": "Добавление пользователя в сегменn\n\n\"user_id\" - id пользователя в формате UUID,\n\n\"slugs_add\" - список названий сегментов для добавления,\n\n\"slugs_del\" - список названий сегментов для удаления,\n\n\"ttl\" (optional) - время автоматического удаления пользователя из сегмента"
+			},
+			"response": []
+		},
+		{
+			"name": "Get active users segments",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"user_id\": \"11111111-1234-5678-1234-567812345678\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/v1/users/segments",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"users",
+						"segments"
+					]
+				},
+				"description": "Получение активных сегментов\n\n\"user_id\" - id пользователя в формате UUID"
+			},
+			"response": []
+		},
+		{
+			"name": "Health",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/health",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"health"
+					]
+				},
+				"description": "Проверка, что сервис работает"
+			},
+			"response": []
+		},
+		{
+			"name": "Get reports link",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"user_id\":\"11111111-2222-5678-1234-567812345678\",\n    \"year\":2023,\n    \"month\":8\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/v1/users/segments/reports",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"users",
+						"segments",
+						"reports"
+					]
+				},
+				"description": "Получение отчета в формате csv\n\n\"user_id\" - id пользователя в формате UUID,\n\n\"year\" - год,\n\n\"month\" - месяц"
+			},
+			"response": []
+		},
+		{
+			"name": "Get files",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://0.0.0.0:8080/api/v1/segments/files?file_id=e6f54f2a-afc5-4079-9910-7f56c6a720d6",
+					"protocol": "http",
+					"host": [
+						"0",
+						"0",
+						"0",
+						"0"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"segments",
+						"files"
+					],
+					"query": [
+						{
+							"key": "file_id",
+							"value": "e6f54f2a-afc5-4079-9910-7f56c6a720d6"
+						}
+					]
+				},
+				"description": "Получение отчета в формате csv\n\n\"file_id\" - id файла отчёта в формате csv"
+			},
+			"response": []
+		}
+	]
+}

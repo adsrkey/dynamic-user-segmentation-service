@@ -30,13 +30,16 @@ type SegmentTx struct {
 	SegmentID uuid.UUID
 }
 
+// ttl in format
 type TTLTx struct {
 	TTL string
 }
 
+// ttl return format
 type TTLTxR struct {
 	UserID    uuid.UUID
 	SegmentID uuid.UUID
+	Slug      string
 }
 
 type GetActiveSegments struct {

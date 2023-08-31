@@ -3,8 +3,11 @@ app:
   version: '1.0.0'
 
 http:
-  host: 'localhost'
+  host: '0.0.0.0' # inside docker
   port: '8080'
+
+job:
+  ttl_worker_timeout: 60 #seconds
 
 logger:
   log_level: 'debug'

@@ -3,7 +3,8 @@ package repository
 import (
 	"context"
 
-	dto "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler/user"
+	segmentDTO "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler/segment"
+	userDTO "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler/user"
 	"github.com/adsrkey/dynamic-user-segmentation-service/pkg/postgres"
 	"github.com/jackc/pgx/v5"
 
@@ -11,33 +12,43 @@ import (
 )
 
 type User interface {
+	Pool
+
 	CreateUser(ctx context.Context, userID uuid.UUID) error
 
 	SelectUser(ctx context.Context, userID uuid.UUID) error
 	SelectActiveUserSegments(ctx context.Context, userID uuid.UUID) (slugs []string, err error)
 	SelectSegmentID(ctx context.Context, slug string) (uuid.UUID, error)
-	SelectReport(ctx context.Context, input dto.ReportInput) (reports []dto.Report, err error)
+	SelectReport(ctx context.Context, input userDTO.ReportInput) (reports []userDTO.Report, err error)
 
-	SegmentTx(ctx context.Context, tx pgx.Tx, input dto.SegmentTx) (operation dto.Operation, err error)
+	SegmentTx
+	AddUserSegmentToOperationsOutboxTx(ctx context.Context, tx pgx.Tx, operation userDTO.SegmentTx) (operationID uuid.UUID, err error)
 
-	GetPool() postgres.PgxPool
-
-	DeleteSegmentTTL(ctx context.Context, tx pgx.Tx, data dto.TTLTx) (err error)
-
-	AddToOutbox
 	TTL
 }
 
 type Segment interface {
-	Create(ctx context.Context, operation dto.Operation) (segmentID uuid.UUID, err error)
+	Pool
 
-	Delete(ctx context.Context, operation dto.Operation) (err error)
+	CreateSegment(ctx context.Context, tx pgx.Tx, operation segmentDTO.Operation) (segmentID uuid.UUID, err error)
+
+	DeleteSegment(ctx context.Context, operation userDTO.SegmentTx) (err error)
+
+	TotalUserCount(ctx context.Context, operation segmentDTO.Operation) (result segmentDTO.Total, err error)
+
+	SegmentTx
+	AddSegmentToOperationsOutboxTx(ctx context.Context, tx pgx.Tx, operation userDTO.SegmentTx) (operationID uuid.UUID, err error)
 }
 
-type AddToOutbox interface {
-	AddToOperationsOutboxTx(ctx context.Context, tx pgx.Tx, operation dto.SegmentTx) (operationID uuid.UUID, err error)
+type SegmentTx interface {
+	SegmentTx(ctx context.Context, tx pgx.Tx, input userDTO.SegmentTx) (operation userDTO.Operation, err error)
+}
+
+type Pool interface {
+	GetPool() postgres.PgxPool
 }
 
 type TTL interface {
-	SelectSegmentTTL(ctx context.Context, tx pgx.Tx, data dto.TTLTx) (results []dto.TTLTxR, err error)
+	SelectSegmentTTL(ctx context.Context, tx pgx.Tx, data userDTO.TTLTx) (results []userDTO.TTLTxR, err error)
+	TTLMarkDone(ctx context.Context, tx pgx.Tx, data userDTO.TTLTx) (err error)
 }

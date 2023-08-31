@@ -227,7 +227,7 @@ func (uc *UseCase) processOperationsOutbox(ctx context.Context, tx pgx.Tx, opera
 			CreatedAt: op.OperationAt,
 		}
 
-		_, err := uc.repo.AddToOperationsOutboxTx(ctx, tx, operation)
+		_, err := uc.repo.AddUserSegmentToOperationsOutboxTx(ctx, tx, operation)
 		if err != nil {
 			return err
 		}

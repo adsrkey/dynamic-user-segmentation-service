@@ -1,4 +1,4 @@
-package user
+package repo
 
 import (
 	"context"
@@ -8,14 +8,14 @@ import (
 	"time"
 
 	"github.com/Masterminds/squirrel"
-	dto "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler/user"
+	userDTO "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler/user"
 	repoerrs "github.com/adsrkey/dynamic-user-segmentation-service/internal/repository/postgres/errors"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-func (r *Repo) ttlTx(ctx context.Context, tx pgx.Tx, input dto.SegmentTx) (err error) {
+func (r *Repo) ttlTx(ctx context.Context, tx pgx.Tx, input userDTO.SegmentTx) (err error) {
 	sql, args, err := r.Builder.
 		Insert("ttl_segments").
 		Columns("user_id", "segment_id", "ttl").
@@ -23,7 +23,6 @@ func (r *Repo) ttlTx(ctx context.Context, tx pgx.Tx, input dto.SegmentTx) (err e
 		Suffix("RETURNING id").
 		ToSql()
 
-	// TODO: хм, может на хранимки переписать
 	if err != nil {
 		return err
 	}
@@ -35,8 +34,7 @@ func (r *Repo) ttlTx(ctx context.Context, tx pgx.Tx, input dto.SegmentTx) (err e
 	return nil
 }
 
-func (r *Repo) SegmentTx(ctx context.Context, tx pgx.Tx, input dto.SegmentTx) (operation dto.Operation, err error) {
-	// Select segment_id
+func (r *Repo) SegmentTx(ctx context.Context, tx pgx.Tx, input userDTO.SegmentTx) (operation userDTO.Operation, err error) {
 	var (
 		selectedSegmentID uuid.UUID
 	)
@@ -45,13 +43,11 @@ func (r *Repo) SegmentTx(ctx context.Context, tx pgx.Tx, input dto.SegmentTx) (o
 		selectedSegmentID = input.SegmentID
 	} else {
 		selectedSegmentID, err = r.selectSegmentTx(ctx, tx, input.Slug)
-		// rollback inside selectSegmentTx if err
 		if err != nil {
-			return dto.Operation{}, err
+			return userDTO.Operation{}, err
 		}
 	}
 
-	// TODO: select user_id if exists // create user
 	var (
 		segmentID uuid.UUID
 		sql       string
@@ -60,12 +56,11 @@ func (r *Repo) SegmentTx(ctx context.Context, tx pgx.Tx, input dto.SegmentTx) (o
 	)
 
 	if input.Operation == AddProcess {
-		// add ttl
 		if !reflect.DeepEqual(input.TTL, time.Time{}) {
 			input.SegmentID = selectedSegmentID
 			err = r.ttlTx(ctx, tx, input)
 			if err != nil {
-				return dto.Operation{}, err
+				return userDTO.Operation{}, err
 			}
 		}
 
@@ -77,7 +72,7 @@ func (r *Repo) SegmentTx(ctx context.Context, tx pgx.Tx, input dto.SegmentTx) (o
 			ToSql()
 
 		if err != nil {
-			return dto.Operation{}, err
+			return userDTO.Operation{}, err
 		}
 
 		errMsg = "err: add: "
@@ -89,7 +84,7 @@ func (r *Repo) SegmentTx(ctx context.Context, tx pgx.Tx, input dto.SegmentTx) (o
 			ToSql()
 
 		if err != nil {
-			return dto.Operation{}, err
+			return userDTO.Operation{}, err
 		}
 
 		errMsg = "err: delete: "
@@ -100,34 +95,32 @@ func (r *Repo) SegmentTx(ctx context.Context, tx pgx.Tx, input dto.SegmentTx) (o
 
 		errRollback := tx.Rollback(ctx)
 		if errRollback != nil {
-			return dto.Operation{}, errRollback
+			return userDTO.Operation{}, errRollback
 		}
 
 		var pgErr *pgconn.PgError
 		if ok := errors.As(err, &pgErr); ok {
 			if pgErr.Code == "23505" {
 				errMsg = "slug with name:" + input.Slug + " " + errMsg + repoerrs.ErrAlreadyExists.Error() + " user_id:" + input.UserID.String()
-				return dto.Operation{}, errors.New(errMsg)
+				return userDTO.Operation{}, errors.New(errMsg)
 			}
 			if pgErr.Code == "23503" {
 				errMsg = "slug with name:" + input.Slug + " " + errMsg + repoerrs.ErrNotFound.Error() + " user_id:" + input.UserID.String()
-				return dto.Operation{}, errors.New(errMsg)
+				return userDTO.Operation{}, errors.New(errMsg)
 			}
 		}
 
 		if ok := errors.Is(err, pgx.ErrNoRows); ok {
-			// TODO: logger
-			r.Log.Debug(err)
 			errMsg = "slug with name:" + input.Slug + " " + errMsg + repoerrs.ErrNotFound.Error() + " user_id:" + input.UserID.String()
-			return dto.Operation{}, errors.New(errMsg)
+			return userDTO.Operation{}, errors.New(errMsg)
 		}
 
 		errMsg = "UserRepo.AddToOperationsOutboxTx - tx.QueryRow:" + err.Error()
 
-		return dto.Operation{}, errors.New(errMsg)
+		return userDTO.Operation{}, errors.New(errMsg)
 	}
 
-	op := dto.Operation{
+	op := userDTO.Operation{
 		UserID:      input.UserID,
 		Segment:     input.Slug,
 		Operation:   input.Operation,
@@ -138,7 +131,7 @@ func (r *Repo) SegmentTx(ctx context.Context, tx pgx.Tx, input dto.SegmentTx) (o
 
 }
 
-func (r *Repo) AddToOperationsOutboxTx(ctx context.Context, tx pgx.Tx, operation dto.SegmentTx) (operationID uuid.UUID, err error) {
+func (r *Repo) AddUserSegmentToOperationsOutboxTx(ctx context.Context, tx pgx.Tx, operation userDTO.SegmentTx) (operationID uuid.UUID, err error) {
 	var (
 		sql  string
 		args []any
@@ -157,13 +150,12 @@ func (r *Repo) AddToOperationsOutboxTx(ctx context.Context, tx pgx.Tx, operation
 	// Insert
 	err = tx.QueryRow(ctx, sql, args...).Scan(&operationID)
 	if err != nil {
-		// r.Log.Debugf("err: %v", err)
 		var errMsg string
 
 		var pgErr *pgconn.PgError
 		if ok := errors.As(err, &pgErr); ok {
 			if pgErr.Code == "23505" {
-				errMsg = repoerrs.ErrAlreadyExists.Error() + " for the user with id:" + operation.UserID.String()
+				errMsg = repoerrs.ErrAlreadyExists.Error() + "slug: " + operation.Slug + " for the user with id:" + operation.UserID.String()
 				return uuid.UUID{}, errors.New(errMsg)
 			}
 			if pgErr.Code == "23503" {

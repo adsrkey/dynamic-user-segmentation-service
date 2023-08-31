@@ -22,17 +22,22 @@ import (
 func Run(cfg *config.Config) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	// echo - http framework
 	e := echo.New()
 
 	// configuration logger
 	e.Logger.SetLevel(log.DEBUG)
-	// e.Logger.SetPrefix(cfg.Name)
-	e.Logger.SetOutput(os.Stdout)
+
+	logFile, err := os.OpenFile("./logs/all.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		fmt.Printf("error opening file: %v", err)
+		os.Exit(1)
+	}
+	e.Logger.SetOutput(logFile)
+
 	log := e.Logger
 	e.Validator = validator.NewValidator()
-
-	// e.Use(middleware.RequestID())
 
 	// Repositories
 	log.Info("Initializing postgres...")
@@ -55,19 +60,20 @@ func Run(cfg *config.Config) {
 
 	usecases := usecase.New().SetSegment(segmentUseCase).SetUser(userUseCase).Build()
 
-	worker := ttl_worker.New(repo.User)
+	worker := ttl_worker.New(repo.User, log)
 
-	TTLWorkerTimeout := 10 * time.Second
+	TTLWorkerTimeout := time.Duration(cfg.Job.TTLWorkerTimeout) * time.Second
 
 	go func() {
 		for {
-			<-time.After(TTLWorkerTimeout)
 			select {
 			case <-ctx.Done():
 				return
-			default:
+			case <-time.After(TTLWorkerTimeout):
+				go func() {
+					worker.DeleteUserFromSegment(ctx)
+				}()
 			}
-			worker.DeleteUserFromSegment(ctx)
 		}
 	}()
 

@@ -1,4 +1,4 @@
-package user
+package repo
 
 import (
 	"github.com/adsrkey/dynamic-user-segmentation-service/pkg/postgres"

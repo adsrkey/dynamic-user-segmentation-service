@@ -1,4 +1,4 @@
-package user
+package repo
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/squirrel"
-	dto "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler/user"
+	userDTO "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler/user"
 	repoerrs "github.com/adsrkey/dynamic-user-segmentation-service/internal/repository/postgres/errors"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -132,6 +132,7 @@ func (r *Repo) SelectActiveUserSegments(ctx context.Context, userID uuid.UUID) (
 	if err != nil {
 		return nil, err
 	}
+	defer conn.Release()
 
 	sql, args, err := r.Builder.Select("slug").
 		From("segments_users as su").
@@ -141,23 +142,15 @@ func (r *Repo) SelectActiveUserSegments(ctx context.Context, userID uuid.UUID) (
 
 	slugs = make([]string, 0, 0)
 
-	rows, err := conn.Query(ctx, sql, args...)
+	tx, err := conn.BeginTx(ctx, pgx.TxOptions{
+		AccessMode: pgx.ReadOnly,
+		IsoLevel:   pgx.RepeatableRead,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO:
-	conn.Release()
-
-	for rows.Next() {
-		var n string
-		err = rows.Scan(&n)
-		if err != nil {
-			return nil, err
-		}
-		slugs = append(slugs, n)
-	}
-
+	rows, err := tx.Query(ctx, sql, args...)
 	if err != nil {
 		r.Log.Debugf("err: %v", err)
 
@@ -170,10 +163,30 @@ func (r *Repo) SelectActiveUserSegments(ctx context.Context, userID uuid.UUID) (
 		return nil, fmt.Errorf("UserRepo.CreateUser - r.Pool.QueryRow: %v", err)
 	}
 
+	defer rows.Close()
+
+	for rows.Next() {
+		var n string
+		err = rows.Scan(&n)
+		if err != nil {
+			return nil, err
+		}
+		slugs = append(slugs, n)
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		errRollback := tx.Rollback(ctx)
+		if errRollback != nil {
+			return nil, errRollback
+		}
+		return nil, err
+	}
+
 	return slugs, err
 }
 
-func (r *Repo) SelectReport(ctx context.Context, input dto.ReportInput) (reports []dto.Report, err error) {
+func (r *Repo) SelectReport(ctx context.Context, input userDTO.ReportInput) (reports []userDTO.Report, err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -209,7 +222,7 @@ func (r *Repo) SelectReport(ctx context.Context, input dto.ReportInput) (reports
 	return reports, nil
 }
 
-func (r *Repo) SelectSegment(ctx context.Context, tx pgx.Tx, data dto.TTLTx) (results []dto.TTLTxR, err error) {
+func (r *Repo) SelectSegment(ctx context.Context, tx pgx.Tx, data userDTO.TTLTx) (results []userDTO.TTLTxR, err error) {
 	sql, args, err := r.Builder.Select("user_id", "segment_id").
 		From("ttl_segments").
 		Where(squirrel.LtOrEq{"ttl": data.TTL}).
@@ -223,15 +236,16 @@ func (r *Repo) SelectSegment(ctx context.Context, tx pgx.Tx, data dto.TTLTx) (re
 		return nil, err
 	}
 
-	results = make([]dto.TTLTxR, 0)
+	results = make([]userDTO.TTLTxR, 0)
 
 	for rows.Next() {
-		var result dto.TTLTxR
+		var result userDTO.TTLTxR
 		if err := rows.Scan(&result.UserID, &result.SegmentID); err != nil {
 			return nil, err
 		}
 		results = append(results, result)
 	}
+	defer rows.Close()
 
 	return results, nil
 }
@@ -261,7 +275,7 @@ func (r *Repo) selectSegmentTx(ctx context.Context, tx pgx.Tx, slug string) (uui
 	return selectedSegmentID, nil
 }
 
-func (r *Repo) selectReportTx(ctx context.Context, tx pgx.Tx, input dto.ReportInput) (reports []dto.Report, err error) {
+func (r *Repo) selectReportTx(ctx context.Context, tx pgx.Tx, input userDTO.ReportInput) (reports []userDTO.Report, err error) {
 
 	operationAt := time.Date(input.Year, input.Month, 1, 0, 0, 0, 0, time.UTC)
 
@@ -285,11 +299,12 @@ func (r *Repo) selectReportTx(ctx context.Context, tx pgx.Tx, input dto.ReportIn
 
 		return nil, repoerrs.ErrDB
 	}
+	defer rows.Close()
 
-	reports = make([]dto.Report, 0, 1)
+	reports = make([]userDTO.Report, 0, 1)
 
 	for rows.Next() {
-		var report dto.Report
+		var report userDTO.Report
 		if err := rows.Scan(&report.ID, &report.UserID, &report.Segment,
 			&report.Operation, &report.OperationAt); err != nil {
 			return nil, err
@@ -300,14 +315,18 @@ func (r *Repo) selectReportTx(ctx context.Context, tx pgx.Tx, input dto.ReportIn
 	return reports, nil
 }
 
-func (r *Repo) SelectSegmentTTL(ctx context.Context, tx pgx.Tx, data dto.TTLTx) (results []dto.TTLTxR, err error) {
+func (r *Repo) SelectSegmentTTL(ctx context.Context, tx pgx.Tx, data userDTO.TTLTx) (results []userDTO.TTLTxR, err error) {
 	ttl, err := time.Parse(time.RFC3339, data.TTL)
 	if err != nil {
 		return nil, err
 	}
-	sql, args, err := r.Builder.Select("user_id", "segment_id").
-		From("ttl_segments").
-		Where(squirrel.LtOrEq{"ttl": ttl}).
+
+	// Join -> slug
+	sql, args, err := r.Builder.Select("user_id", "segment_id", "slug").
+		From("ttl_segments as t").
+		Where(squirrel.LtOrEq{"t.ttl": ttl}).
+		Where(squirrel.Eq{"done": false}).
+		Join("public.segments s ON s.id = t.segment_id").
 		ToSql()
 	if err != nil {
 		return nil, err
@@ -317,12 +336,13 @@ func (r *Repo) SelectSegmentTTL(ctx context.Context, tx pgx.Tx, data dto.TTLTx) 
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
-	results = make([]dto.TTLTxR, 0, 1)
+	results = make([]userDTO.TTLTxR, 0, 1)
 
 	for rows.Next() {
-		var result dto.TTLTxR
-		if err := rows.Scan(&result.UserID, &result.SegmentID); err != nil {
+		var result userDTO.TTLTxR
+		if err := rows.Scan(&result.UserID, &result.SegmentID, &result.Slug); err != nil {
 			return nil, err
 		}
 		results = append(results, result)
@@ -331,15 +351,16 @@ func (r *Repo) SelectSegmentTTL(ctx context.Context, tx pgx.Tx, data dto.TTLTx) 
 	return results, nil
 }
 
-func (r *Repo) DeleteSegmentTTL(ctx context.Context, tx pgx.Tx, data dto.TTLTx) (err error) {
+func (r *Repo) TTLMarkDone(ctx context.Context, tx pgx.Tx, data userDTO.TTLTx) (err error) {
 	ttl, err := time.Parse(time.RFC3339, data.TTL)
 	if err != nil {
 		return err
 	}
 
 	sql, args, err := r.Builder.
-		Delete("ttl_segments").
-		Where(squirrel.Eq{"ttl": ttl}).
+		Update("ttl_segments").
+		Set("done", true).
+		Where(squirrel.LtOrEq{"ttl": ttl}).
 		ToSql()
 	if err != nil {
 		return err

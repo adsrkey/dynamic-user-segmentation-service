@@ -33,5 +33,5 @@ func GenerateReportsLink(reports []dto.Report, host string) (string, error) {
 		return "", err
 	}
 
-	return host + "/api/v1/user/files?file_id=" + fileId.String(), nil
+	return host + "/api/v1/users/segments/files?file_id=" + fileId.String(), nil
 }

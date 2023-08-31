@@ -28,7 +28,7 @@ type handler struct {
 func New(
 	group *echo.Group,
 	uc usecases.User,
-	log logger.Logger) *handler { // TODO: to interface
+	log logger.Logger) *handler {
 
 	h := &handler{
 		uc:    uc,
@@ -59,7 +59,7 @@ func (h *handler) addToSegment(c echo.Context) (err error) {
 	var (
 		now = time.Now()
 		// context
-		timeout     = 5 * time.Minute
+		timeout     = 5 * time.Second
 		ctx, cancel = context.WithTimeout(c.Request().Context(), timeout)
 
 		// request body dto
@@ -83,9 +83,6 @@ func (h *handler) addToSegment(c echo.Context) (err error) {
 	input.OperationAt = now
 
 	if input.Ttl != "" {
-		//ttl - seconds
-
-		// ttl like "2006-01-02T15:04:05Z07:00"
 		ttl, err := time.Parse(time.RFC3339, input.Ttl)
 		if err != nil {
 			return c.JSON(http.StatusConflict, response.ErrResponse{
@@ -105,24 +102,19 @@ func (h *handler) addToSegment(c echo.Context) (err error) {
 		isSlugsAddEmpty = len(input.SlugsAdd) == 0
 		isSlugsDelEmpty = len(input.SlugsDel) == 0
 
-		// slice of duplicates
-		dup        = make([]string, 0, 1)
-		isDupEmpty = len(dup) == 0
+		dup = make([]string, 0, 1)
 	)
 
-	// Duplicate. Checking if there are duplicates
+	// Duplicates. Checking if there are duplicates
 	if !isSlugsAddEmpty && !isSlugsDelEmpty {
 		for _, v := range input.SlugsDel {
 			if contains(input.SlugsAdd, v) {
 				dup = append(dup, v)
 			}
 		}
-		// ttl лишний
-	} else if !isSlugsAddEmpty && isSlugsDelEmpty {
-		// TTL to worker
-		// h.uc.TTLWorker()
 	}
 
+	var isDupEmpty = len(dup) == 0
 	if !isDupEmpty {
 		return c.JSON(http.StatusConflict, response.ErrResponse{
 			Message: "contains duplicates data in arrays with duplicate slugs: " + strings.Join(dup[:], ","),
@@ -155,7 +147,7 @@ func (h *handler) addToSegment(c echo.Context) (err error) {
 func (h *handler) getActiveSegments(c echo.Context) (err error) {
 	var (
 		// context
-		timeout     = 1 * time.Second
+		timeout     = 5 * time.Second
 		ctx, cancel = context.WithTimeout(c.Request().Context(), timeout)
 
 		input dto.GetActiveSegments
@@ -204,7 +196,6 @@ func (h *handler) getActiveSegments(c echo.Context) (err error) {
 	})
 }
 
-// TODO:
 func (h *handler) reports(c echo.Context) (err error) {
 	var (
 		// context
@@ -230,17 +221,18 @@ func (h *handler) reports(c echo.Context) (err error) {
 		return err
 	}
 
-	// TODO:
-
 	reports, err := h.uc.Reports(ctx, input)
 	if err != nil {
-		// TODO:
 		return err
+	}
+	if len(reports) == 0 {
+		return c.JSON(http.StatusNotFound, response.ErrResponse{
+			Message: "no reports",
+		})
 	}
 
 	link, err := linkgenerator.GenerateReportsLink(reports, "http://"+c.Echo().Server.Addr)
 	if err != nil {
-		// TODO:
 		return err
 	}
 
@@ -253,8 +245,6 @@ func (h *handler) file(c echo.Context) (err error) {
 	var (
 		fileId string
 	)
-
-	// TODO:
 
 	fileId = c.QueryParam("file_id")
 	if fileId == "" {
@@ -271,7 +261,6 @@ func (h *handler) file(c echo.Context) (err error) {
 		return err
 	}
 
-	c.Response().Status = http.StatusOK
-	http.ServeFile(c.Response().Writer, c.Request(), file.Name())
+	c.Stream(http.StatusOK, "text/csv", file)
 	return
 }

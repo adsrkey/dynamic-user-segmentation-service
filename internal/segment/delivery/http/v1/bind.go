@@ -8,7 +8,14 @@ import (
 	"github.com/pkg/errors"
 )
 
-func BindSlugInput(c echo.Context, input *dto.SlugInput) error {
+func BindSegmentAddInput(c echo.Context, input *dto.SegmentAddInput) error {
+	if err := c.Bind(input); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, errors.Wrap(err, "could not decode user data"))
+	}
+	return nil
+}
+
+func BindSegmentDelInput(c echo.Context, input *dto.SegmentDelInput) error {
 	if err := c.Bind(input); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, errors.Wrap(err, "could not decode user data"))
 	}

@@ -1,4 +1,4 @@
-package segment
+package repo
 
 import (
 	"context"
@@ -6,23 +6,75 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/squirrel"
-	dto "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler/user"
+	dtoSegment "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler/segment"
+	userDTO "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler/user"
 	repoerrs "github.com/adsrkey/dynamic-user-segmentation-service/internal/repository/postgres/errors"
-	"github.com/adsrkey/dynamic-user-segmentation-service/pkg/postgres"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-type Repo struct {
-	*postgres.Postgres
+func (r *Repo) TotalUserCount(ctx context.Context, operation dtoSegment.Operation) (result dtoSegment.Total, err error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	conn, err := r.Pool.Acquire(ctx)
+	if err != nil {
+		return dtoSegment.Total{}, err
+	}
+	defer func() {
+		conn.Release()
+	}()
+
+	sql, args, err := r.Builder.
+		Select("id").
+		From("users").
+		GroupBy("id").
+		ToSql()
+	if err != nil {
+		return dtoSegment.Total{}, err
+	}
+
+	tx, err := conn.BeginTx(ctx, pgx.TxOptions{
+		IsoLevel:   pgx.ReadCommitted,
+		AccessMode: pgx.ReadOnly,
+	})
+
+	result.UserIDs = make([]uuid.UUID, 0)
+
+	row, err := tx.Query(ctx, sql, args...)
+	if err != nil {
+		r.Log.Debugf("err: %v", err)
+		return dtoSegment.Total{}, repoerrs.ErrDB
+	}
+	defer row.Close()
+
+	for row.Next() {
+		var userID uuid.UUID
+		err := row.Scan(&userID)
+		if err != nil {
+			return dtoSegment.Total{}, err
+		}
+		result.UserIDs = append(result.UserIDs, userID)
+	}
+
+	result.TotalCount = len(result.UserIDs)
+
+	if !tx.Conn().IsClosed() {
+		err = tx.Commit(ctx)
+		if err != nil {
+			errRollback := tx.Rollback(ctx)
+			if errRollback != nil {
+				return dtoSegment.Total{}, errRollback
+			}
+			return dtoSegment.Total{}, err
+		}
+	}
+
+	return result, nil
 }
 
-func New(pg *postgres.Postgres) *Repo {
-	return &Repo{pg}
-}
-
-func (r *Repo) Create(ctx context.Context, operation dto.Operation) (segmentID uuid.UUID, err error) {
+func (r *Repo) CreateSegment(ctx context.Context, tx pgx.Tx, operation dtoSegment.Operation) (segmentID uuid.UUID, err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -44,11 +96,6 @@ func (r *Repo) Create(ctx context.Context, operation dto.Operation) (segmentID u
 		return uuid.UUID{}, err
 	}
 
-	tx, err := conn.BeginTx(ctx, pgx.TxOptions{
-		IsoLevel:   pgx.ReadCommitted,
-		AccessMode: pgx.ReadWrite,
-	})
-
 	err = tx.QueryRow(ctx, sql, args...).Scan(&segmentID)
 	if err != nil {
 		r.Log.Debugf("err: %v", err)
@@ -63,21 +110,10 @@ func (r *Repo) Create(ctx context.Context, operation dto.Operation) (segmentID u
 		return uuid.UUID{}, repoerrs.ErrDB
 	}
 
-	if !tx.Conn().IsClosed() {
-		err = tx.Commit(ctx)
-		if err != nil {
-			errRollback := tx.Rollback(ctx)
-			if errRollback != nil {
-				return uuid.UUID{}, errRollback
-			}
-			return uuid.UUID{}, err
-		}
-	}
-
 	return segmentID, nil
 }
 
-func (r *Repo) AddToOperationsOutboxTx(ctx context.Context, tx pgx.Tx, operation dto.Operation) (operationID uuid.UUID, err error) {
+func (r *Repo) AddSegmentToOperationsOutboxTx(ctx context.Context, tx pgx.Tx, operation userDTO.SegmentTx) (operationID uuid.UUID, err error) {
 	var (
 		sql  string
 		args []any
@@ -86,7 +122,7 @@ func (r *Repo) AddToOperationsOutboxTx(ctx context.Context, tx pgx.Tx, operation
 	sql, args, err = r.Builder.
 		Insert("operations_outbox").
 		Columns("user_id", "segment", "operation", "operation_at").
-		Values(operation.UserID, operation.Segment, operation.Operation, operation.OperationAt).
+		Values(operation.UserID, operation.Slug, operation.Operation, operation.CreatedAt).
 		Suffix("RETURNING id").
 		ToSql()
 	if err != nil {
@@ -96,7 +132,6 @@ func (r *Repo) AddToOperationsOutboxTx(ctx context.Context, tx pgx.Tx, operation
 	// Insert
 	err = tx.QueryRow(ctx, sql, args...).Scan(&operationID)
 	if err != nil {
-		// r.Log.Debugf("err: %v", err)
 		var errMsg string
 
 		var pgErr *pgconn.PgError
@@ -116,7 +151,7 @@ func (r *Repo) AddToOperationsOutboxTx(ctx context.Context, tx pgx.Tx, operation
 			return uuid.UUID{},
 				fmt.Errorf("operation: '%s' with segment name: '%s' for the user with id: %s: %s to add",
 					operation.Operation,
-					operation.Segment,
+					operation.Slug,
 					operation.UserID,
 					repoerrs.ErrNotFound)
 		}
@@ -129,7 +164,7 @@ func (r *Repo) AddToOperationsOutboxTx(ctx context.Context, tx pgx.Tx, operation
 	return operationID, nil
 }
 
-func (r *Repo) Delete(ctx context.Context, operation dto.Operation) (err error) {
+func (r *Repo) DeleteSegment(ctx context.Context, operation userDTO.SegmentTx) (err error) {
 	conn, err := r.Pool.Acquire(ctx)
 	if err != nil {
 		return err
@@ -149,27 +184,31 @@ func (r *Repo) Delete(ctx context.Context, operation dto.Operation) (err error) 
 
 	var (
 		segmentID  uuid.UUID
-		operations []dto.Operation
+		operations []userDTO.SegmentTx
 	)
 
-	operations = make([]dto.Operation, 0)
+	operations = make([]userDTO.SegmentTx, 0)
 
 	{
 		sql, args, err := r.Builder.Select("s.id, su.user_id").
 			From("segments as s").
 			Join("public.segments_users su ON s.id = su.segment_id").
-			Where(squirrel.Eq{"slug": operation.Segment}).
+			Where(squirrel.Eq{"slug": operation.Slug}).
 			ToSql()
 
 		rows, err := tx.Query(ctx, sql, args...)
 		if err != nil {
 			return err
 		}
+		defer rows.Close()
 		for rows.Next() {
 			if err := rows.Scan(&segmentID, &operation.UserID); err != nil {
 				return err
 			}
 			operations = append(operations, operation)
+		}
+		if len(operations) == 0 {
+			return repoerrs.ErrDoesNotExist
 		}
 	}
 
@@ -189,9 +228,9 @@ func (r *Repo) Delete(ctx context.Context, operation dto.Operation) (err error) 
 	}
 
 	for _, operation := range operations {
-		_, err := r.AddToOperationsOutboxTx(ctx, tx, operation)
+		_, err := r.AddSegmentToOperationsOutboxTx(ctx, tx, operation)
 		if err != nil {
-			return nil
+			return err
 		}
 	}
 

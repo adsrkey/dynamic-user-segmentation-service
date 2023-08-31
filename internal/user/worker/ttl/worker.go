@@ -6,20 +6,27 @@ import (
 
 	dto "github.com/adsrkey/dynamic-user-segmentation-service/internal/dto/handler/user"
 	repo "github.com/adsrkey/dynamic-user-segmentation-service/internal/repository/postgres"
+	"github.com/adsrkey/dynamic-user-segmentation-service/pkg/logger"
 	"github.com/jackc/pgx/v5"
 )
 
 type TTLWorker struct {
 	repo repo.User
+	log  logger.Logger
 }
 
-func New(repo repo.User) *TTLWorker {
-	return &TTLWorker{repo: repo}
+func New(repo repo.User, log logger.Logger) *TTLWorker {
+	return &TTLWorker{repo: repo, log: log}
 }
 
 func (worker *TTLWorker) DeleteUserFromSegment(ctx context.Context) (err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	defer func() {
+		if err != nil {
+			worker.log.Debug(err.Error())
+		}
+	}()
 
 	conn, err := worker.repo.GetPool().Acquire(ctx)
 	if err != nil {
@@ -35,10 +42,12 @@ func (worker *TTLWorker) DeleteUserFromSegment(ctx context.Context) (err error) 
 		return err
 	}
 
-	now := time.Now().Format(time.RFC3339)
+	now := time.Now()
+
+	nowFormat := now.Format(time.RFC3339)
 
 	ttlx := dto.TTLTx{
-		TTL: now,
+		TTL: nowFormat,
 	}
 
 	results, err := worker.repo.SelectSegmentTTL(ctx, tx, ttlx)
@@ -51,14 +60,29 @@ func (worker *TTLWorker) DeleteUserFromSegment(ctx context.Context) (err error) 
 		input.SegmentID = v.SegmentID
 		input.Operation = dto.DeleteProcess
 		input.UserID = v.UserID
+		input.Slug = v.Slug
 
-		_, err = worker.repo.SegmentTx(ctx, tx, input)
+		op, err := worker.repo.SegmentTx(ctx, tx, input)
+		if err != nil {
+			return err
+		}
+
+		segmentTx := dto.SegmentTx{
+			UserID:    input.UserID,
+			Slug:      op.Segment,
+			Operation: input.Operation,
+			CreatedAt: now,
+			TTL:       input.TTL,
+			SegmentID: input.SegmentID,
+		}
+
+		_, err = worker.repo.AddUserSegmentToOperationsOutboxTx(ctx, tx, segmentTx)
 		if err != nil {
 			return err
 		}
 	}
 
-	err = worker.repo.DeleteSegmentTTL(ctx, tx, ttlx)
+	err = worker.repo.TTLMarkDone(ctx, tx, ttlx)
 	if err != nil {
 		return err
 	}
